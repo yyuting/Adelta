@@ -35,12 +35,11 @@ dtype = None
 
 default_width = 960
 default_height = 640
-
-default_duration = 1
-default_fs = 44100
+default_depth = 640
 
 camera_width = default_width
 camea_height = default_height
+camera_depth = default_depth
 
 all_modes = ['visualize_gradient', 'render', 'optimization', 'search_init']
 all_metrics = ['L2']
@@ -62,7 +61,7 @@ valid_end_idx = -1
 
 top_db = 160
 
-tile_offset = [0, 0]
+tile_offset = [0, 0, 0]
 
 frame_idx = 0
 
@@ -174,44 +173,53 @@ def generate_interactive_frag(args, params, do_prune):
     
     open(frag_file, 'w').write(frag_str)
 
-def imsave(name, img, need_transpose=False):
-    if need_transpose:
-        if len(img.shape) == 2:
-            img = img.transpose
+def imsave(name, img, need_transpose=False, ndims=2):
+    
+    if ndims == 1:
+        plt.plot(img)
+        plt.savefig(name)
+        plt.close()
+    elif ndims == 2:
+        if need_transpose:
+            if len(img.shape) == 2:
+                img = img.transpose
+            else:
+                assert len(img.shape) == 3
+                img = img.transpose((1, 0, 2))
+        skimage.io.imsave(name, np.clip(img, 0, 1))
+    elif ndims == 3:
+        #ax = plt.figure().add_subplot(projection='3d')
+        #ax.voxels(img[..., 0].astype(bool))
+        
+        dense_points = np.where(np.sum(img != 0, -1) > 0)
+        ax = plt.figure().add_subplot(projection='3d')
+        
+        if img.shape[-1] == 1:
+            ax.scatter(*dense_points, s=5)
         else:
-            assert len(img.shape) == 3
-            img = img.transpose((1, 0, 2))
-    skimage.io.imsave(name, np.clip(img, 0, 1))
+            assert img.shape[-1] == 3
+            ax.scatter(*dense_points, c=np.clip(img[dense_points], 0, 1), s=5)
+        
+        plt.savefig(name, bbox_inches='tight')
+        plt.close()
 
-def prepare_uv(width=default_width, height=default_height):
+def prepare_uv(width=default_width, height=default_height, depth=default_depth):
     
     assert valid_start_idx > 0
     assert valid_end_idx < 0
     
     extra_size = valid_start_idx - valid_end_idx
-
-    xv, yv = np.meshgrid(np.arange(width + extra_size).astype('f') + tile_offset[0] - valid_start_idx, 
-                         np.arange(height + extra_size).astype('f') + tile_offset[1] - valid_start_idx,
-                         indexing='ij')
+    
+    xv, yv, zv = np.meshgrid(np.arange(width + extra_size).astype('f') + tile_offset[0] - valid_start_idx, 
+                             np.arange(height + extra_size).astype('f') + tile_offset[1] - valid_start_idx,
+                             np.arange(width + extra_size).astype('f') + tile_offset[2] - valid_start_idx,
+                             indexing='ij')
 
     u = np.transpose(xv)
     v = np.transpose(yv)
-
+    w = np.transpose(zv)
         
-    return u, v
-
-def prepare_t(duration=default_duration, fs=default_fs):
-    
-    assert valid_start_idx > 0
-    assert valid_end_idx < 0
-        
-    extra_size = valid_start_idx - valid_end_idx
-
-    t = np.arange(-valid_start_idx, duration * fs - valid_end_idx)
-        
-    t = t.astype('f')
-        
-    return t
+    return u, v, w
 
 def L2(x, y, extra_args={}):
     # TODO: using reduce_sum for easier manual gradient computation
@@ -281,7 +289,7 @@ def replicate_padding(tensor, pad_size):
         
     return tensor
 
-def nscale_metric_functor(nscale, base_metric, smoothing_sigmas=None, axis=None, backend='tf', render_format='image', ignore_last_n_scale=0):
+def nscale_metric_functor(nscale, base_metric, smoothing_sigmas=None, axis=None, backend='tf', ndims=2, ignore_last_n_scale=0):
     """
     smoothing_sigmas applied to last scale only
     """
@@ -292,13 +300,14 @@ def nscale_metric_functor(nscale, base_metric, smoothing_sigmas=None, axis=None,
                 
         loss = 0
         
-        if render_format != 'image':
-            x = tf.expand_dims(x, -1)
-            y = tf.expand_dims(y, -1)
-            
-            if render_format == 'audio':
-                x = tf.expand_dims(x, -1)
-                y = tf.expand_dims(y, -1)
+        if backend == 'tf':
+            expand_dims = tf.expand_dims
+        else:
+            expand_dims = torch.unsqueeze
+        
+        if ndims == 1:
+            x = expand_dims(x, -1)
+            y = expand_dims(y, -1)
         
         nsamples = int(x.shape[0])
         nchannels = int(x.shape[-1])
@@ -309,15 +318,22 @@ def nscale_metric_functor(nscale, base_metric, smoothing_sigmas=None, axis=None,
             downsample_scale = [1, 2]
         elif axis == 'y':
             downsample_scale = [2, 1]
-        
-        if backend == 'torch':
-            # use C x 1 x w x h
-            # batch should always be 1
-            # put color in the N position because all color channels are convolved by the same kernel
-            x = torch.permute(x, (3, 0, 1, 2))
-            y = torch.permute(y, (3, 0, 1, 2))
-            assert nsamples == 1
-            avg_pool = torch.nn.AvgPool2d(downsample_scale, 2)
+            
+        if ndims == 3:
+            if backend == 'torch':
+                x = torch.permute(x, (4, 0, 1, 2, 3))
+                y = torch.permute(y, (4, 0, 1, 2, 3))
+                assert nsamples == 1
+                avg_pool = torch.nn.AvgPool3d(downsample_scale, 2)
+        else:
+            if backend == 'torch':
+                # use C x 1 x w x h
+                # batch should always be 1
+                # put color in the N position because all color channels are convolved by the same kernel
+                x = torch.permute(x, (3, 0, 1, 2))
+                y = torch.permute(y, (3, 0, 1, 2))
+                assert nsamples == 1
+                avg_pool = torch.nn.AvgPool2d(downsample_scale, 2)
         
         
             
@@ -354,7 +370,7 @@ def nscale_metric_functor(nscale, base_metric, smoothing_sigmas=None, axis=None,
                     nh = int(x.shape[1])
                     nw = int(x.shape[2])
 
-                    if render_format == 'image':
+                    if ndims == 2:
                         # combine n and c dimension so that the identical convolution takes on every channel
                         transposed_x = tf.expand_dims(tf.reshape(tf.transpose(x, (0, 3, 1, 2)), (nsamples * nchannels, nh, nw)), -1)
                         transposed_y = tf.expand_dims(tf.reshape(tf.transpose(y, (0, 3, 1, 2)), (nsamples * nchannels, nh, nw)), -1)
@@ -363,6 +379,8 @@ def nscale_metric_functor(nscale, base_metric, smoothing_sigmas=None, axis=None,
                     transposed_y = y
 
                 for current_sigma in smoothing_sigmas:
+                    
+                    assert ndims <= 2
 
                     assert current_sigma > 0
 
@@ -610,30 +628,38 @@ def generate_finite_diff_tensor(loss, h, args_range=None, finite_diff_both_sides
     
     return gt_deriv
 
-def visualize_gradient(deriv_img, gt_deriv_img, dir, prefix, is_color=False, same_scale=False, gt_nsamples=None):
+def visualize_gradient(deriv_img, gt_deriv_img, dir, prefix, is_color=False, same_scale=False, gt_nsamples=None, ndims=2):
+    
+    current_slice = (slice(None),) + (slice(valid_start_idx, valid_end_idx),) * ndims
     
     deriv_img[np.isnan(deriv_img)] = 0
-    gt_deriv_img[np.isnan(gt_deriv_img)] = 0
     
-    deriv_img = deriv_img[:, valid_start_idx:valid_end_idx, valid_start_idx:valid_end_idx]
-    gt_deriv_img = gt_deriv_img[:, valid_start_idx:valid_end_idx, valid_start_idx:valid_end_idx]
-
-    current_deriv_img = np.empty((deriv_img.shape[1], deriv_img.shape[2], 3))
-    current_gt_deriv_img = np.empty((deriv_img.shape[1], deriv_img.shape[2], 3))
-    err_img = np.empty((deriv_img.shape[1], deriv_img.shape[2], 3))
-
-    for k in range(gt_deriv_img.shape[0]):
+    deriv_img = deriv_img[current_slice]
+    if ndims == 1:
+        deriv_img = np.expand_dims(deriv_img, -1)
+    current_deriv_img = np.empty(deriv_img.shape[1:] + (3,))
+    #current_deriv_img = np.empty((deriv_img.shape[1], deriv_img.shape[2], 3))
+    
+    if gt_deriv_img is not None:
+        gt_deriv_img[np.isnan(gt_deriv_img)] = 0
+        gt_deriv_img = gt_deriv_img[current_slice]
+        if ndims == 1:
+            gt_deriv_img = np.expand_dims(gt_deriv_img, -1)
+        current_gt_deriv_img = np.empty((deriv_img.shape[1], deriv_img.shape[2], 3))
+        
+    for k in range(deriv_img.shape[0]):
 
         img_thre_pct = 90
         nc = 1
         
         current_deriv_img[:] = 0
-        current_deriv_img[:, :, 0] = (deriv_img[k, :, :] > 0) * deriv_img[k, :, :]
-        current_deriv_img[:, :, 2] = (deriv_img[k, :, :] < 0) * (-deriv_img[k, :, :])
+        current_deriv_img[..., 0] = (deriv_img[k] > 0) * deriv_img[k]
+        current_deriv_img[..., 2] = (deriv_img[k] < 0) * (-deriv_img[k])
 
-        current_gt_deriv_img[:] = 0
-        current_gt_deriv_img[:, :, 0] = (gt_deriv_img[k, :, :] > 0) * gt_deriv_img[k, :, :]
-        current_gt_deriv_img[:, :, 2] = (gt_deriv_img[k, :, :] < 0) * (-gt_deriv_img[k, :, :])
+        if gt_deriv_img is not None:
+            current_gt_deriv_img[:] = 0
+            current_gt_deriv_img[:, :, 0] = (gt_deriv_img[k, :, :] > 0) * gt_deriv_img[k, :, :]
+            current_gt_deriv_img[:, :, 2] = (gt_deriv_img[k, :, :] < 0) * (-gt_deriv_img[k, :, :])
 
         if current_deriv_img.max() > 0:
 
@@ -643,39 +669,48 @@ def visualize_gradient(deriv_img, gt_deriv_img, dir, prefix, is_color=False, sam
             except:
                 deriv_vals_thre = 1
 
-            nonzero_gt_deriv_img_vals = current_gt_deriv_img[current_gt_deriv_img > 0]
-            try:
-                gt_deriv_vals_thre = np.percentile(nonzero_gt_deriv_img_vals, img_thre_pct)
-            except:
-                gt_deriv_vals_thre = 1
+            if gt_deriv_img is not None:
+                nonzero_gt_deriv_img_vals = current_gt_deriv_img[current_gt_deriv_img > 0]
+                try:
+                    gt_deriv_vals_thre = np.percentile(nonzero_gt_deriv_img_vals, img_thre_pct)
+                except:
+                    gt_deriv_vals_thre = 1
 
-            if same_scale:
-                deriv_vals_thre = gt_deriv_vals_thre
+                if same_scale:
+                    deriv_vals_thre = gt_deriv_vals_thre
 
+            imsave(os.path.join(dir, '%s_deriv_%d.png' % (prefix, k)), np.clip(current_deriv_img / deriv_vals_thre, 0, 1), ndims=ndims)
 
-            skimage.io.imsave(os.path.join(dir, '%s_deriv_%d.png' % (prefix, k)), np.clip(current_deriv_img / deriv_vals_thre, 0, 1), check_contrast=False)
-
-            skimage.io.imsave(os.path.join(dir, '%s_gt_deriv_%d.png' % (prefix, k)), np.clip(current_gt_deriv_img / gt_deriv_vals_thre, 0, 1), check_contrast=False)
-
-            print(k, deriv_vals_thre, gt_deriv_vals_thre)
+            if gt_deriv_img is not None:
+                imsave(os.path.join(dir, '%s_gt_deriv_%d.png' % (prefix, k)), np.clip(current_gt_deriv_img / gt_deriv_vals_thre, 0, 1), ndims=ndims)
             
-def generate_tensor(init_values, args_range=None, backend='tf', render_format='image'):
+def generate_tensor(init_values, args_range=None, backend='tf', ndims=2):
 
     if args_range is None:
         args_range = np.ones(init_values.shape)
         
     
-    if render_format == 'image':
-        u, v = prepare_uv(width=default_width, height=default_height)
-        u = np.expand_dims(u, 0)
-        v = np.expand_dims(v, 0)
-        
-        uv = [u, v]
+    u, v, w = prepare_uv(width=default_width, height=default_height)
+    
+    if ndims == 1:
+        current_slice = (0, 0)
+    elif ndims == 2:
+        current_slice = (0,)
+    elif ndims == 3:
+        current_slice = slice(None)
     else:
-        t = prepare_t(duration=default_duration, fs=default_fs, render_format=render_format)
-        t = np.expand_dims(t, 0)
-        u = t
-        uv = [t]
+        raise
+        
+    u = u[current_slice]
+    v = v[current_slice]
+    w = w[current_slice]
+    
+    u = np.expand_dims(u, 0)
+    v = np.expand_dims(v, 0)
+    w = np.expand_dims(w, 0)
+
+    uv = [u, v, w][:ndims]
+
         
     var_initializer = init_values / args_range
     
@@ -684,13 +719,15 @@ def generate_tensor(init_values, args_range=None, backend='tf', render_format='i
     if backend == 'tf':
         tunable_params = tf.Variable(var_initializer, dtype=dtype)
     else:
-        assert render_format == 'image'
         tunable_params = []
         for i in range(var_initializer.shape[0]):
             tunable_params.append(torch.tensor(var_initializer[i], dtype=torch.float32, requires_grad=True, device='cuda'))
                                   
-        u = torch.tensor(u).to(device='cuda')
-        v = torch.tensor(v).to(device='cuda')
+        for i in range(len(uv)):
+            uv[i] = torch.tensor(uv[i]).to(device='cuda')
+        
+        #u = torch.tensor(u).to(device='cuda')
+        #v = torch.tensor(v).to(device='cuda')
         
         ones_like_pl = torch.tensor(ones_like_pl).cuda()
 
@@ -774,7 +811,7 @@ def estimate_std(sess, loss, set_random_var_opt, nparams, thre=0.01, feed_dict={
 
 def main():
     
-    global finite_diff_h, default_fs
+    global finite_diff_h
     
     parser = argparse_util.ArgumentParser(description='approx gradient')
     parser.add_argument('--dir', dest='dir', default='', help='directory for task')
@@ -796,7 +833,6 @@ def main():
     parser.add_argument('--base_loss_stage', dest='base_loss_stage', type=int, default=-1, help='if specified, and if in multi_scale_optimization mode, use the nth stage as base_loss, if n = -1, use L2 loss')
     parser.add_argument('--opt_subset_idx', dest='opt_subset_idx', default='', help='if specified, only optimize variables indexed by this argument')
     parser.add_argument('--render_size', dest='render_size', default='', help='if specified, overwrite default_width and default_height')
-    parser.add_argument('--render_fs', dest='render_fs', type=float, default=default_fs, help='specifies the fs used to render audio')
     parser.add_argument('--camera_size', dest='camera_size', default='', help='if specified, will be used to feed to the shader program if the shader needs information about size of camera receptive field')
     parser.add_argument('--multi_scale_previous_loss_ratio', dest='multi_scale_previous_loss_ratio', type=float, default=1, help='specifies at multi scale optimization, what ratio should the previous stage loss take in the current loss')
     parser.add_argument('--profile_timing', dest='profile_timing', action='store_true', help='if specified, verbosely output timing for each step')
@@ -902,7 +938,7 @@ def main():
     parser.add_argument('--unnormalized_par', dest='unnormalized_par', action='store_true', help='if specified in render mode, assume input parameters are unnormalized')
     parser.add_argument('--aa_nsamples', dest='aa_nsamples', type=int, default=0, help='if specified, render antialiased image')
     parser.add_argument('--shader_args', dest='shader_args', default='', help='specifies arguments that can be set for shader programs, should be the form of name0:val0#name1:val1... values will be evaluated using eval()')
-    parser.add_argument('--render_format', dest='render_format', default='image', help='specifies the format of the render output, supports image, audio, spec')
+    parser.add_argument('--ndims', dest='ndims', type=int, default=2, help='specifies the dimensionality of the rendering')
     
     args = parser.parse_args()
     
@@ -926,42 +962,63 @@ def main():
         args.save_all_par = True
         args.save_all_deriv = True
     
-    global default_width, default_height, camera_width, camera_height, default_duration
+    global default_width, default_height, default_depth, camera_width, camera_height, default_depth
     if args.render_size != '':
         render_size = args.render_size.split(',')
-        if args.render_format == 'image':
-            assert len(render_size) == 2
-            default_width = int(render_size[0])
+        
+        assert args.ndims == len(render_size)
+        assert args.ndims in [1, 2, 3]
+        
+        default_width = int(render_size[0])
+        
+        if args.ndims > 1:
             default_height = int(render_size[1])
         else:
-            assert args.render_format in ['audio', 'spec']
-            assert len(render_size) == 1
-            default_duration = float(render_size[0])
-            default_fs = args.render_fs
+            default_height = -1
+            
+        if args.ndims > 2:
+            default_depth = int(render_size[2])
+        else:
+            default_depth = -1
         
     if args.camera_size != '':
         camera_size = args.camera_size.split(',')
-        assert len(camera_size) == 2
+        assert len(camera_size) == args.ndims
         camera_width = int(camera_size[0])
-        camera_height = int(camera_size[1])
+        
+        if args.ndims > 1:
+            camera_height = int(camera_size[1])
+        else:
+            camera_height = -1
+            
+        if args.ndims > 2:
+            camera_depth = int(camera_size[2])
+        else:
+            camera_depth = -1
     else:
         camera_width = default_width
         camera_height = default_height
+        camera_depth = default_depth
         
     global tile_offset, tile_size
+    
+    tile_size = [default_width, default_height, default_depth]
+    
     if args.tile_offset != '':
         offset_str = args.tile_offset.split(',')
         if offset_str[0] == '':
             offset_str = offset_str[1:]
-        assert len(offset_str) == 2
-        tile_offset[0] = int(offset_str[0])
-        tile_offset[1] = int(offset_str[1])
+        assert len(offset_str) == args.ndims
+        for i in range(args.ndims):
+            tile_offset[i] = int(offset_str[i])
 
     if args.tile_size != '':
         size_str = args.tile_size.split(',')
-        assert len(size_str) == 2
-        tile_size[0] = int(size_str[0])
-        tile_size[1] = int(size_str[1])
+        assert len(size_str) == args.ndims
+        for i in range(args.ndims):
+            tile_size[i] = int(size_str[i])
+            
+    current_slice = (slice(None),) + (slice(valid_start_idx, valid_end_idx),) * args.ndims
     
     if not os.path.isdir(args.dir):
         os.mkdir(args.dir)
@@ -1039,6 +1096,8 @@ def main():
         
     if args.gradient_methods_optimization == 'AD':
         extra_args += ' --AD_only '
+        
+    extra_args += '--ndims %d ' % args.ndims
             
     generate_code_cmd = 'cd apps; python render_single.py %s render_%s --backend %s --compiler_modes %s --use_select_rule %d --use_multiplication_rule %d %s; cd ..' % (args.dir, args.shader, args.backend, mode_str, args.use_select_rule, args.use_multiplication_rule, extra_args)
     
@@ -1196,6 +1255,9 @@ def main():
                 except:
                     print('base metric %s not supported' % metric_name)
                     raise
+                    
+            if args.ndims == 1:
+                axis = 'y'
                 
             #if smoothing_sigmas is not None:
             #    assert len(smoothing_sigmas) == nscale
@@ -1216,7 +1278,7 @@ def main():
                                               opt_subset_idx=opt_subset_idx,
                                               match_target=match_target)
             else:
-                metric = nscale_metric_functor(nscale, base_metric, smoothing_sigmas=smoothing_sigmas, axis=axis, backend=args.backend, render_format=args.render_format, ignore_last_n_scale=args.ignore_last_n_scale)
+                metric = nscale_metric_functor(nscale, base_metric, smoothing_sigmas=smoothing_sigmas, axis=axis, backend=args.backend, ndims=args.ndims, ignore_last_n_scale=args.ignore_last_n_scale)
             
             metric_funcs.append(metric)
         
@@ -1306,13 +1368,14 @@ def main():
                 vec_output = [None] * 3
                 trace = [None] * compiler_module.f_log_intermediate_len
                 
-                params_orig, set_par_functor, tunable_params = generate_tensor(gt_values, args_range=args_range, backend=args.backend, render_format=args.render_format)
+                params_orig, set_par_functor, tunable_params = generate_tensor(gt_values, args_range=args_range, backend=args.backend, ndims=args.ndims)
                                 
-                if args.render_format == 'image':
-                    u = params_orig[0]
+                u = params_orig[0]
+                if args.ndims > 1:
                     v = params_orig[1]
-                else:
-                    t = params_orig[0]
+                if args.ndims > 2:
+                    w = params_orig[2]
+                
                     
                 X_orig = params_orig[-1]
                 
@@ -1434,12 +1497,12 @@ def main():
 
                     set_par = set_par_functor(sess)
                     with tf.name_scope('forward') as scope:
-                        trace = compiler_module.f(u, v, X_orig, trace, vec_output, camera_width, camera_height)
+                        trace = compiler_module.f(*params_orig[:-1], X_orig, trace, vec_output, camera_width, camera_height, camera_depth)
                 else:
                     # when visualizing gradient, do not use the cusomitized operator
                     # treat fw and bw as regular python functions
                     # because pytorch does not provide API for computing the gradient map
-                    trace = compiler_module.f(u, v, X_orig, trace, vec_output, camera_width, camera_height)
+                    trace = compiler_module.f(*params_orig[:-1], X_orig, trace, vec_output, camera_width, camera_height, camera_depth)
                     set_par = set_par_functor()
 
                 vec_output = trace[:3]
@@ -1450,10 +1513,12 @@ def main():
                     else:
                         output = tf.expand_dims(vec_output[0], -1)
                 else:
-                    assert args.is_color
-                    output = torch.stack(vec_output[:3], -1)
+                    if args.is_color:
+                        output = torch.stack(vec_output[:3], -1)
+                    else:
+                        output = torch.unsqueeze(vec_output[0], -1)
 
-                output_valid = output[:, valid_start_idx:valid_end_idx, valid_start_idx:valid_end_idx]
+                output_valid = output[current_slice]
                 output_orig = output[0]                
 
                 feed_dict = {}
@@ -1507,7 +1572,10 @@ def main():
             if os.path.exists(gt_name):
                 os.remove(gt_name)
 
-            imsave(os.path.join(args.dir, 'gt.png'), np.clip(gt_img, 0, 1), args.backend == 'hl')
+            if args.ndims <= 3:
+                imsave(os.path.join(args.dir, 'gt.png'), gt_img, args.backend == 'hl', ndims=args.ndims)
+            else:
+                raise
             
             binary_conditions = []
             choose_u_ls = []
@@ -1527,8 +1595,11 @@ def main():
                     # Because TF can only efficiently generate the Jacobian of a single scalr output
                     # NOT the Jacobian of a w x h x 3 image
                     assert args.gradient_methods_optimization != 'AD'
-
-                    dL_dcol = np.ones((1, int(output.shape[1]), int(output.shape[2])))
+                    
+                    dL_dcol_shape = (1,)
+                    for i in range(args.ndims):
+                        dL_dcol_shape += (int(output.shape[i + 1]),)
+                    dL_dcol = np.ones(dL_dcol_shape)
                     
                     if args.backend == 'torch':
                         dL_dcol = torch.tensor(dL_dcol, dtype=torch.float32, device='cuda')
@@ -1541,7 +1612,7 @@ def main():
 
                     if args.backend == 'tf':
                         with tf.name_scope('backward') as scope:
-                            param_gradients = compiler_module.g(u, v, X_orig, dL_dcol, trace, [], camera_width, camera_height)
+                            param_gradients = compiler_module.g(*params_orig[:-1], X_orig, dL_dcol, trace, [], camera_width, camera_height, camera_depth)
                         param_gradients = tf.concat(param_gradients, 0)
                         all_ops = tf.get_default_graph().get_operations()
                         
@@ -1552,7 +1623,7 @@ def main():
                         print('forward ops:', len(forward_ops))
                         print('backward ops:', len(backward_ops))
                     else:
-                        param_gradients = compiler_module.g(u, v, X_orig, dL_dcol, trace, [], camera_width, camera_height)
+                        param_gradients = compiler_module.g(*params_orig[:-1], X_orig, dL_dcol, trace, [], camera_width, camera_height, camera_depth)
                         param_gradients = [param_gradients[i].cpu().detach().numpy() * args_range[i] for i in range(len(param_gradients))]
 
                 else:
@@ -2199,7 +2270,7 @@ def main():
                     assert not need_grad
                     
                     for _ in range(10):
-                        imsave(os.path.join(args.dir, 'init%s%05d.png' % (args.suffix, render_count)), img, args.backend == 'hl')
+                        imsave(os.path.join(args.dir, 'init%s%05d.png' % (args.suffix, render_count)), img, args.backend == 'hl', ndims=args.ndims)
                         render_count += 1
                 else:
                     if args.backend == 'tf':
@@ -2209,8 +2280,11 @@ def main():
                         img = sess.run(output_orig)
                     elif args.backend == 'torch':
                         X_orig = set_par(normalized_init_values)
-                        trace = compiler_module.f(u, v, X_orig, trace, vec_output, camera_width, camera_height)
-                        img = torch.stack(trace[:3], -1)[0].cpu().detach().numpy()
+                        trace = compiler_module.f(*params_orig[:-1], X_orig, trace, vec_output, camera_width, camera_height, camera_depth)
+                        if args.is_color:
+                            img = torch.stack(trace[:3], -1)[0].cpu().detach().numpy()
+                        else:
+                            img = torch.unsqueeze(trace[0], -1)[0].cpu().detach().numpy()
                     elif args.backend == 'hl':
                         img = halide_fw(init_values)
                         if args.aa_nsamples > 0:
@@ -2221,12 +2295,12 @@ def main():
                     else:
                         raise
 
-                    imsave(os.path.join(args.dir, 'init%s%05d.png' % (args.suffix, render_count)), img, args.backend == 'hl')
+                    imsave(os.path.join(args.dir, 'init%s%05d.png' % (args.suffix, render_count)), img, args.backend == 'hl', ndims=args.ndims)
                     render_count += 1
 
                 if need_grad and i == args.visualize_idx:
 
-                    imsave(os.path.join(args.dir, 'visualize%s.png' % args.suffix), img, args.backend == 'hl')
+                    imsave(os.path.join(args.dir, 'visualize%s.png' % args.suffix), img, args.backend == 'hl', ndims=args.ndims)
                     
                     if args.deriv_metric_line and args.line_endpoints_method == 'kernel_smooth_debug':
                         
@@ -2581,19 +2655,18 @@ def main():
                         render_kw = {'finite_diff_h': finite_diff_h}
                         gt_deriv_img = np.stack(halide_FD(init_values, render_kw), 0)[..., 0].transpose((0, 2, 1))
                     elif args.backend == 'tf':
-
                         deriv_img = sess.run(param_gradients)
-                        gt_deriv_img = deriv_img
+                        gt_deriv_img = None
                     elif args.backend == 'torch':
                         deriv_img = np.concatenate(param_gradients, 0)
-                        gt_deriv_img = deriv_img
+                        gt_deriv_img = None
                     else:
                         raise
 
 
                     numpy.save(os.path.join(args.dir, 'gradient_map.npy'), deriv_img)
                         
-                    visualize_gradient(deriv_img, gt_deriv_img, args.dir, metric_name, is_color=args.is_color, same_scale=args.visualize_same_scale, gt_nsamples=gt_nsamples)
+                    visualize_gradient(deriv_img, gt_deriv_img, args.dir, metric_name, is_color=args.is_color, same_scale=args.visualize_same_scale, gt_nsamples=gt_nsamples, ndims=args.ndims)
 
                     if args.save_npy:
                         np.save(os.path.join(args.dir, 'ours_deriv.npy'), deriv_img)
@@ -2650,7 +2723,7 @@ def main():
                     
                     do_prune = get_do_prune(metric, compiler_module, render_kw, init_values_pool[0, :args_range.shape[0]] / args_range)
 
-            generate_interactive_frag(args, init_values_pool[0, :args_range.shape[0]], do_prune)
+                generate_interactive_frag(args, init_values_pool[0, :args_range.shape[0]], do_prune)
 
         elif mode == 'search_init':
             assert args.backend == 'hl'
@@ -2741,7 +2814,7 @@ def main():
                 for idx in best_loss.keys():
                     img = halide_fw(best_loss[idx][1])
                     extra_args = best_loss[idx][2]
-                    imsave(os.path.join(args.dir, 'sampled%s_init%d.png' % (args.suffix, init_count)), img, True)
+                    imsave(os.path.join(args.dir, 'sampled%s_init%d.png' % (args.suffix, init_count)), img, True, ndims=args.ndims)
                     print('sampled %d extra args:')
                     print(extra_args)
                     init_count += 1
@@ -2806,14 +2879,14 @@ def main():
                 if use_tf:
                     tf.reset_default_graph()
 
-                params_orig, set_par_functor, tunable_params = generate_tensor(gt_values, args_range=args_range, backend=args.backend, render_format=args.render_format)
+                params_orig, set_par_functor, tunable_params = generate_tensor(gt_values, args_range=args_range, backend=args.backend, ndims=args.ndims)
 
-                if args.render_format == 'image':
-                    u = params_orig[0]
+                u = params_orig[0]
+                if args.ndims > 1:
                     v = params_orig[1]
-                else:
-                    t = params_orig[0]
-                    raw_t = params_orig[0]
+                if args.ndims > 2:
+                    w = params_orig[2]
+                    
                 X_orig = params_orig[-1]
                 
                 X = X_orig
@@ -2981,14 +3054,14 @@ def main():
 
                                 return ans
                         else:
+                            
+                            noise_shape = [len(random_var_indices),
+                                           default_height + extra_size,
+                                           default_width + extra_size,
+                                           default_depth + extra_size]
+                            
+                            noise_shape = noise_shape[:1 + args.ndims]
 
-                            if args.render_format == 'image':
-                                noise_shape = [len(random_var_indices),
-                                               default_height + extra_size,
-                                               default_width + extra_size]
-                            else:
-                                noise_shape = [len(random_var_indices),
-                                               t.shape[1]]
                             noise_val = np.random.normal(size=noise_shape).astype('f')
 
                             #noise_val = np.load('/n/fs/scratch/yutingy/debug_noise.npy')
@@ -3043,40 +3116,30 @@ def main():
                     sess.run(tf.local_variables_initializer())
                     sess.run(tf.global_variables_initializer())
                     
-                    if args.render_format == 'image':
 
-                        with tf.name_scope('forward') as scope:
-                            trace = compiler_module.f(u, v, X_orig, trace, vec_output, camera_width, camera_height)
+                    with tf.name_scope('forward') as scope:
+                        trace = compiler_module.f(*params_orig[:-1], X_orig, trace, vec_output, camera_width, camera_height, camera_depth)
 
-                        vec_output = trace[:3]
-                        if args.is_color:
-                            output = tf.stack(vec_output, -1)
-                        else:
-                            output = tf.expand_dims(vec_output[0], -1)
+                    if args.is_color:
+                        output = tf.stack(trace[:3], -1)
                     else:
-                        with tf.name_scope('forward') as scope:
-                            trace = compiler_module.f(t, X_orig)
-                        output = trace[0]
+                        output = tf.expand_dims(trace[0], -1)
                 else:
                     
                     #X_orig = []
                     #for _ in range(nargs):
                     #    X_orig.append(torch.tensor(0., dtype=torch.float32, requires_grad=True, device="cuda"))
                     
-                    output = shader(u, v, *X_orig, camera_width, camera_height)
+                    output = shader(*params_orig[:-1], *X_orig, camera_width, camera_height, camera_depth)
                     sess = None
-                    assert args.is_color
                     
 
                 
 
                 feed_dict = {}
                 raw_spec = []
-
-                if args.render_format == 'image':
-                    output_valid = output[:, valid_start_idx:valid_end_idx, valid_start_idx:valid_end_idx]
-                else:
-                    output_valid = output[:, valid_start_idx:valid_end_idx]
+                
+                output_valid = output[current_slice]
                     
                 raw_output_valid = output_valid
                     
@@ -3103,16 +3166,11 @@ def main():
                     gt_img = halide_fw(gt_values)
                 else:
                     raise
-                
-                if args.render_format == 'image':
-                    imsave(os.path.join(args.dir, 'gt.png'), np.clip(gt_img, 0, 1), args.backend == 'hl')
-                elif args.render_format == 'audio':
                     
-                    plt.plot(gt_img)
-                    plt.savefig(os.path.join(args.dir, 'gt.png'))
-                    plt.close()
+                if args.ndims <= 3:
+                    imsave(os.path.join(args.dir, 'gt.png'), gt_img, args.backend == 'hl', ndims=args.ndims)
                 else:
-                    imsave(os.path.join(args.dir, 'gt.png'), gt_img, args.backend == 'hl')
+                    raise
             else:
                 if args.gt_file.endswith('.png'):
                     gt_img = skimage.io.imread(args.gt_file)
@@ -3123,22 +3181,18 @@ def main():
                     gt_img = np.load(args.gt_file).astype(np.float32)
                     gt_name = os.path.join(args.dir, 'gt.npy')
                 
-                if args.render_format != 'image':
-                    gt_img = gt_img
-                elif args.is_color:
-                    assert len(gt_img.shape) == 3 and gt_img.shape[2] == 3
-                    if args.gt_transposed:
+                if ndims == 2 and args.gt_transposed:
+                    if args.is_color:
+                        assert gt_img.shape[-1] == 3
                         gt_img = gt_img.transpose((1, 0, 2))
-                else:
-                    if len(gt_img.shape) == 3:
-                        gt_img = gt_img[..., :1]
                     else:
-                        assert len(gt_img.shape) == 2
-                        gt_img = np.expand_dims(gt_img, -1)
-                    
-                    if args.gt_transposed:
+                        if len(gt_img.shape) == 3:
+                            gt_img = gt_img[..., :1]
+                        else:
+                            assert len(gt_img.shape) == 2
+                            gt_img = np.expand_dims(gt_img, -1)
                         gt_img = gt_img.transpose()
-                        
+                
                 if gt_name != args.gt_file:
                     if os.path.exists(gt_name):
                         os.remove(gt_name)
@@ -3171,30 +3225,19 @@ def main():
 
                     if use_tf:
                         
-                        if args.render_format == 'image':
-                            with tf.name_scope('backward') as scope:
-                                # deriv wrt to NOT normalized parameters
-                                derivs = [tf.concat(compiler_module.g(u, v, X_orig, [1, 0, 0], trace, param_gradients, camera_width, camera_height), 0),
-                                          tf.concat(compiler_module.g(u, v, X_orig, [0, 1, 0], trace, param_gradients, camera_width, camera_height), 0),
-                                          tf.concat(compiler_module.g(u, v, X_orig, [0, 0, 1], trace, param_gradients, camera_width, camera_height), 0)]
-                            
-                            deriv_output_with_respect_to_param = tf.stack(derivs, -1)
-                            
-                            deriv_output_with_respect_to_param = deriv_output_with_respect_to_param[:, valid_start_idx:valid_end_idx, valid_start_idx:valid_end_idx, :]
-                            deriv_output_with_respect_to_param *= np.expand_dims(np.expand_dims(np.expand_dims(args_range, -1), -1), -1)        
-                        else:
-                            with tf.name_scope('backward') as scope:
-                                derivs = tf.concat(compiler_module.g(t, X_orig, 1, trace), 0)
-                            deriv_output_with_respect_to_param = derivs[..., valid_start_idx:valid_end_idx]
-                            
-                            expanded_args_range = np.expand_dims(args_range, -1)
-                            
-                            if args.render_format != 'audio':
-                                expanded_args_range = np.expand_dims(expanded_args_range, -1)
+                        assert args.ndims == 2, 'TF only supports rendering 2D images'
                         
-                                
-                            deriv_output_with_respect_to_param *= expanded_args_range
+                        with tf.name_scope('backward') as scope:
+                            # deriv wrt to NOT normalized parameters
+                            derivs = [tf.concat(compiler_module.g(*params_orig[:-1], X_orig, [1, 0, 0], trace, param_gradients, camera_width, camera_height, camera_depth), 0),
+                                      tf.concat(compiler_module.g(*params_orig[:-1], X_orig, [0, 1, 0], trace, param_gradients, camera_width, camera_height, camera_depth), 0),
+                                      tf.concat(compiler_module.g(*params_orig[:-1], X_orig, [0, 0, 1], trace, param_gradients, camera_width, camera_height, camera_depth), 0)]
 
+                        deriv_output_with_respect_to_param = tf.stack(derivs, -1)
+
+                        deriv_output_with_respect_to_param = deriv_output_with_respect_to_param[:, valid_start_idx:valid_end_idx, valid_start_idx:valid_end_idx, :]
+                        deriv_output_with_respect_to_param *= np.expand_dims(np.expand_dims(np.expand_dims(args_range, -1), -1), -1)        
+                       
                         tiled_deriv_with_pad = None
 
                         
@@ -3298,11 +3341,7 @@ def main():
 
                 
                 if base_loss is None:
-                    if args.render_format == 'image':
-                        base_loss = tf.reduce_mean((x - y) ** 2)
-                    else:
-                        base_loss = true_loss
-
+                    base_loss = tf.reduce_mean((x - y) ** 2)
 
                 all_ops = tf.get_default_graph().get_operations()
                 forward_ops = [op for op in all_ops if op.name.startswith('forward')]
@@ -3425,22 +3464,19 @@ def main():
                                     deriv = np.zeros(1)
                                     for idx in random_noise_lookup.keys():
                                         
-                                        if args.render_format == 'image':
-                                            current_noise = random_noise_lookup[idx][0, valid_start_idx:valid_end_idx, valid_start_idx:valid_end_idx]
+                                        current_noise = random_noise_lookup[idx][current_slice]
+                                        if args.ndims == 2:
                                             current_noise = tf.expand_dims(current_noise, -1)
-                                        else:
-                                            current_noise = random_noise_lookup[idx][0, valid_start_idx:valid_end_idx]
                                         
                                         deriv = deriv + tf.reduce_sum(gradient_map[idx-base_idx_offset] * current_noise)
                                 else:
                                     deriv = []
                                     for i in range(len(random_var_indices)):
                                         idx = random_var_indices[i]
-                                        if args.render_format == 'image':
-                                            current_noise = random_noise_lookup[idx][0, valid_start_idx:valid_end_idx, valid_start_idx:valid_end_idx]
+                                        current_noise = random_noise_lookup[idx][current_slice]
+                                        if args.ndims == 2:
                                             current_noise = tf.expand_dims(current_noise, -1)
-                                        else:
-                                            current_noise = random_noise_lookup[idx][0, valid_start_idx:valid_end_idx]
+                                        
                                         # needs to divide by args_range because gradient_map is on NORMALIZED scale, and we want it to be un-normalized
                                         deriv.append(tf.reduce_sum(gradient_map[idx-base_idx_offset] * current_noise) / args_range[idx])
                                     deriv = tf.stack(deriv)
@@ -3590,9 +3626,9 @@ def main():
                         sess.run(tf.global_variables_initializer())
                     elif args.backend == 'torch':
                         if random_var_scale_opt is None:
-                            opt = torch.optim.Adam(tunable_params, lr=args.learning_rate, beta1=args.opt_beta1, beta2=args.opt_beta2)
+                            opt = torch.optim.Adam(tunable_params, lr=args.learning_rate, betas=(args.opt_beta1, args.opt_beta2))
                         else:
-                            opt = torch.optim.Adam(tunable_params + random_var_scale_opt, lr=args.learning_rate, beta1=args.opt_beta1, beta2=args.opt_beta2)
+                            opt = torch.optim.Adam(tunable_params + random_var_scale_opt, lr=args.learning_rate, betas=(args.opt_beta1, args.opt_beta2))
                     else:
                         if opt is not None:
                             opt.reset()
@@ -3650,9 +3686,9 @@ def main():
                                 sess.run(tf.global_variables_initializer())
                             elif args.backend == 'torch':
                                 if random_var_scale_opt is None:
-                                    opt = torch.optim.Adam(tunable_params, lr=args.learning_rate, beta1=args.opt_beta1, beta2=args.opt_beta2)
+                                    opt = torch.optim.Adam(tunable_params, lr=args.learning_rate, betas=(args.opt_beta1, args.opt_beta2))
                                 else:
-                                    opt = torch.optim.Adam(tunable_params + random_var_scale_opt, lr=args.learning_rate, beta1=args.opt_beta1, beta2=args.opt_beta2)
+                                    opt = torch.optim.Adam(tunable_params + random_var_scale_opt, lr=args.learning_rate, betas=(args.opt_beta1, args.opt_beta2))
                             else:
                                 if opt is not None:
                                     opt.reset() 
@@ -3660,7 +3696,7 @@ def main():
                         if args.backend == 'hl':
                             if ns_wide == 0:
                                 init_img = halide_fw(init_values)
-                                imsave(os.path.join(args.dir, 'init%d.png' % i), np.clip(init_img, 0, 1), True)
+                                imsave(os.path.join(args.dir, 'init%d.png' % i), np.clip(init_img, 0, 1), True, ndims=args.ndims)
                             else:
                                 last_loss_par = np.array(min_loss_par)
                                 
@@ -3686,8 +3722,8 @@ def main():
                                 X_orig = set_par(init_values)
                                 if apply_random is not None:
                                     X_orig = apply_random(X_orig)
-                                init_img = shader(u, v, *X_orig, camera_width, camera_height)[0].cpu().detach().numpy()
-                                imsave(os.path.join(args.dir, 'init%d.png' % i), np.clip(init_img, 0, 1))  
+                                init_img = shader(*params_orig[:-1], *X_orig, camera_width, camera_height, camera_depth)[0].cpu().detach().numpy()
+                                imsave(os.path.join(args.dir, 'init%d.png' % i), init_img, ndims=args.ndims)  
                             else:
                                 last_loss_par = np.array(min_loss_par)
                                 
@@ -3704,7 +3740,7 @@ def main():
                             X_orig = set_par(tunable_params, False)
                             if apply_random is not None:
                                 X_orig = apply_random(X_orig)
-                            x = shader(u, v, *X_orig, camera_width, camera_height)[:, valid_start_idx:valid_end_idx, valid_start_idx:valid_end_idx]
+                            x = shader(*params_orig[:-1], *X_orig, camera_width, camera_height, camera_depth)[current_slice]
                             loss = metric_funcs[0](x, y, {'scale': ns})
                             
                             min_loss_val = float(loss)
@@ -3748,14 +3784,15 @@ def main():
                                 
 
                                 init_img = sess.run(output_valid, feed_dict=feed_dict)[0]
-
-                                if args.render_format == 'image':
-                                    skimage.io.imsave(os.path.join(args.dir, 'init%d.png' % i), np.clip(init_img, 0, 1), check_contrast=False)  
-                                else:
+                                
+                                if args.ndims == 1:
                                     plt.plot(init_img)
                                     plt.savefig(os.path.join(args.dir, 'init%d.png' % i))
                                     plt.close()
- 
+                                elif args.ndims == 2:
+                                    imsave(os.path.join(args.dir, 'init%d.png' % i), np.clip(init_img, 0, 1), args.backend == 'hl', ndims=args.ndims)
+                                else:
+                                    raise
 
 
                             else:
@@ -4111,7 +4148,7 @@ def main():
                                     X_orig = set_par(tunable_params, False)
                                     if apply_random is not None:
                                         X_orig = apply_random(X_orig)
-                                    x = shader(u, v, *X_orig, camera_width, camera_height)[:, valid_start_idx:valid_end_idx, valid_start_idx:valid_end_idx]
+                                    x = shader(*params_orig[:-1], *X_orig, camera_width, camera_height, camera_depth)[current_slice]
                                     loss = metric_funcs[0](x, y, {'scale': ns})
                                     
                                     loss.backward()
@@ -4219,9 +4256,9 @@ def main():
                     elif args.backend == 'torch':
                         X_orig = set_par(min_loss_par)
                         set_random_var(sess, False)
-                        x = shader(u, v, *X_orig, camera_width, camera_height)
-                        result_img = x[0].cpu().detach().numpy()[valid_start_idx:valid_end_idx, valid_start_idx:valid_end_idx]
-                        min_loss_val = float(base_loss(x[:, valid_start_idx:valid_end_idx, valid_start_idx:valid_end_idx], y))
+                        x = shader(*params_orig[:-1], *X_orig, camera_width, camera_height, camera_depth)
+                        result_img = x.cpu().detach().numpy()[current_slice][0]
+                        min_loss_val = float(base_loss(x[current_slice], y))
                         set_random_var(sess, True)
                     else:
                         set_par(min_loss_par, dummy_last_dim)
@@ -4252,15 +4289,7 @@ def main():
                     if args.backend == 'hl':
                         skimage.io.imsave(os.path.join(args.dir, name), np.clip(result_img.transpose((1, 0, 2)), 0, 1), check_contrast=False)
                     else:
-                        if args.render_format == 'image':
-                            skimage.io.imsave(os.path.join(args.dir, name), np.clip(result_img, 0, 1), check_contrast=False)
-                        elif args.render_format == 'spec':
-                            skimage.io.imsave(os.path.join(args.dir, name), result_img, check_contrast=False)
-                        else:
-                            
-                            plt.plot(result_img)
-                            plt.savefig(os.path.join(args.dir, name))
-                            plt.close()
+                        imsave(os.path.join(args.dir, name), result_img, args.backend == 'hl', ndims=args.ndims)
 
                     if random_var_opt_len > 0:
                         if args.backend != 'hl':
@@ -4269,22 +4298,15 @@ def main():
                             if args.backend == 'tf':
                                 result_img = sess.run(output_valid, feed_dict=feed_dict)[0]
                             elif args.backend == 'torch':
-                                x = shader(u, v, *X_orig, camera_width, camera_height)
-                                result_img = x[0].cpu().detach().numpy()[valid_start_idx:valid_end_idx, valid_start_idx:valid_end_idx]
+                                x = shader(*params_orig[:-1], *X_orig, camera_width, camera_height, camera_depth)
+                                result_img = x.cpu().detach().numpy()[current_slice][0]
 
                             result_img = result_img
                         else:
                             result_img = halide_fw(min_loss_par).transpose((1, 0, 2))
 
-                        if args.render_format == 'image':
-                            skimage.io.imsave(os.path.join(args.dir, '%s_random.png' % name_prefix), np.clip(result_img, 0, 1), check_contrast=False)
-                        elif args.render_format == 'spec':
-                            skimage.io.imsave(os.path.join(args.dir, '%s_random.png' % name_prefix), result_img, check_contrast=False)
-                        else:
-                            plt.plot(result_img)
-                            plt.savefig(os.path.join(args.dir, '%s_random.png' % name_prefix))
-                            plt.close()
-
+                        imsave(os.path.join(args.dir, '%s_random.png' % name_prefix), result_img, args.backend == 'hl', ndims=args.ndims)
+                        
                     if args.verbose:
                         print(i, nr, min_loss_iter, min_loss_val)
                         print(min_loss_par, file=logfile)
