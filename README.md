@@ -12,10 +12,12 @@ Download optimization results for ours and baselines from the following Google D
 
 In the Adelta directory, run
 
-    python generate_result.py [optimization_path] generate
+    python generate_result.py <optimization_path> generate
     
 Figures and tables will be generated at optimization_path/restul.
 
-## Compile Halide modules
+## Use our compiler
 
-    python script_compile_halide.py [halide_path] [build_path]
+### Compile Halide modules
+
+    python script_compile_halide.py <halide_path> <build_path>
