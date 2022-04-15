@@ -1,28 +1,6 @@
 """
-------------------------------------------------------------------------------------------------------------------------------
-# render
-
-python approx_gradient.py --dir /n/fs/scratch/yutingy/test_finite_diff_quadratic_bezier_w_col_rotational_offset_better_rendering_quadratic_Z --shader test_finite_diff_quadratic_bezier_w_col_rotational_offset_better_rendering_quadratic_Z --init_values_pool /n/fs/scratch/yutingy/test_finite_diff_quadratic_bezier_w_col_6_rotational_offset_quadratic_Z/render_all.npy --gt_file knots_imgs/overhand/7c.png --gt_transposed --modes render --metrics 3_scale_L2 --gradient_methods_optimization ours --learning_rate 0.01 --finite_diff_h 0.01 --finite_diff_both_sides --render_size 480,480 --is_color --backend hl
-
-python approx_gradient.py --dir /n/fs/scratch/yutingy/test_finite_diff_quadratic_bezier_w_col_rotational_offset_better_rendering_quadratic_Z_no_control --shader test_finite_diff_quadratic_bezier_w_col_rotational_offset_better_rendering_quadratic_Z --init_values_pool /n/fs/scratch/yutingy/test_finite_diff_quadratic_bezier_w_col_6_rotational_offset_quadratic_Z/render_all.npy --gt_file knots_imgs/overhand/7c.png --gt_transposed --modes render --metrics 3_scale_L2 --gradient_methods_optimization ours --learning_rate 0.01 --finite_diff_h 0.01 --finite_diff_both_sides --render_size 480,480 --is_color --backend hl
-
-# somehow Halide is not happy with the complexity
-
-python approx_gradient.py --dir /n/fs/scratch/yutingy/test_finite_diff_quadratic_bezier_w_col_rotational_offset_better_rendering_quadratic_Z_knot_0 --shader test_finite_diff_quadratic_bezier_w_col_rotational_offset_better_rendering_quadratic_Z --init_values_pool /n/fs/scratch/yutingy/test_finite_diff_quadratic_bezier_w_col_6_rotational_offset_quadratic_Z_optimized_knot_0/render_all.npy --gt_file knots_imgs/overhand/7c.png --gt_transposed --modes render --metrics 3_scale_L2 --gradient_methods_optimization ours --learning_rate 0.01 --finite_diff_h 0.01 --finite_diff_both_sides --is_color --backend tf --unnormalized_par --shader_args nropes:1#all_nsplines:[6] --ignore_glsl --camera_size 1600,1600 --render_size 960,480 --tile_offset 280,640
-
-python approx_gradient.py --dir /n/fs/scratch/yutingy/test_finite_diff_quadratic_bezier_w_col_rotational_offset_better_rendering_quadratic_Z_knot_0 --shader test_finite_diff_quadratic_bezier_w_col_rotational_offset_better_rendering_quadratic_Z --init_values_pool /n/fs/scratch/yutingy/test_finite_diff_quadratic_bezier_w_col_6_rotational_offset_quadratic_Z_optimized_knot_0/render_all.npy --gt_file knots_imgs/overhand/7c.png --gt_transposed --modes render --metrics 3_scale_L2 --gradient_methods_optimization ours --learning_rate 0.01 --finite_diff_h 0.01 --finite_diff_both_sides --is_color --backend tf --unnormalized_par --shader_args nropes:1#all_nsplines:[6] --ignore_glsl --render_size 480,480 --suffix _small
-
-cd /n/fs/scratch/yutingy/test_finite_diff_quadratic_bezier_w_col_rotational_offset_better_rendering_quadratic_Z_knot_0; ffmpeg -i init%05d.png -r 30 -c:v libx264 -preset slow -crf 0 -r 30 animation.mp4; cd /n/fs/shaderml/differentiable_compiler
-
-# quicktime compatible
-ffmpeg -i init%05d.png -r 30 -c:v libx264 -pix_fmt yuv420p -filter:v "setpts=0.5*PTS" -r 30 animation.mp4
-
-
-python approx_gradient.py --dir /n/fs/scratch/yutingy/test_finite_diff_quadratic_bezier_w_col_rotational_offset_better_rendering_quadratic_Z_knot_1 --shader test_finite_diff_quadratic_bezier_w_col_rotational_offset_better_rendering_quadratic_Z --init_values_pool /n/fs/scratch/yutingy/test_finite_diff_quadratic_bezier_w_col_4_4_rotational_offset_quadratic_Z_optimized_knot_1/render_all.npy --gt_file knots_imgs/thief/8.png --gt_transposed --modes render --metrics 3_scale_L2 --gradient_methods_optimization ours --learning_rate 0.01 --finite_diff_h 0.01 --finite_diff_both_sides --is_color --unnormalized_par --shader_args nropes:2#all_nsplines:[4,4] --backend tf --camera_size 1500,1500 --render_size 960,480 --tile_offset 232,510
-
-python approx_gradient.py --dir /n/fs/scratch/yutingy/test_finite_diff_quadratic_bezier_w_col_rotational_offset_better_rendering_quadratic_Z_knot_1 --shader test_finite_diff_quadratic_bezier_w_col_rotational_offset_better_rendering_quadratic_Z --init_values_pool /n/fs/scratch/yutingy/test_finite_diff_quadratic_bezier_w_col_4_4_rotational_offset_quadratic_Z_optimized_knot_1/render_all.npy --gt_file knots_imgs/thief/8.png --gt_transposed --modes render --metrics 3_scale_L2 --gradient_methods_optimization ours --learning_rate 0.01 --finite_diff_h 0.01 --finite_diff_both_sides --is_color --unnormalized_par --shader_args nropes:2#all_nsplines:[4,4] --backend tf --render_size 480,480 --suffix _small
-
-cd /n/fs/scratch/yutingy/test_finite_diff_quadratic_bezier_w_col_rotational_offset_better_rendering_quadratic_Z_knot_1; ffmpeg -i init%05d.png init%05d.png -r 30 -c:v libx264 -preset slow -crf 0 -r 30 animation.mp4; cd /n/fs/shaderml/differentiable_compiler
+echo "This shader is only used to help render the final optimized result, use the following command to reproduce rope result:"
+echo "python run_shader.py render_test_finite_diff_quadratic_bezier_w_col_rotational_offset_quadratic_Z_optimized.py <path>"
 """
 
 from render_util import *
@@ -30,6 +8,11 @@ from render_single import render_single
 
 compiler.log_prefix_only = False
 compiler.log_intermediates_less = True
+
+def cmd_check(backend):
+    print('This shader is only used to help render the final optimized result, use the following command to reproduce rope result:')
+    print('python run_shader.py render_test_finite_diff_quadratic_bezier_w_col_rotational_offset_quadratic_Z_optimized.py <path>')
+    raise
 
 nropes = 2
 all_nsplines = [4, 4]

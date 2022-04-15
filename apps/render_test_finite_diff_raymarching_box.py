@@ -6,8 +6,15 @@ python approx_gradient.py --dir /n/fs/scratch/yutingy/test_finite_diff_raymarchi
 from render_util import *
 from render_single import render_single
 
+def cmd_template():
+    
+    cmd = f"""python approx_gradient.py --shader test_finite_diff_raymarching_box --init_values_pool apps/example_init_values/test_finite_diff_raymarching_half_cube_init_values_pool.npy --metrics 5_scale_L2 --is_col"""
+    
+    return cmd
+
 nargs = 9
 args_range = np.array([10, 10, 10, 6.28, 6.28, 6.28, 1, 1, 1])
+
 
 width=960
 height=640

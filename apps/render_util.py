@@ -211,7 +211,7 @@ def list_or_scalar_to_str(render_t):
     else:
         return str(render_t)
 
-def render_shader(objective_functor, is_color=default_is_color, base_dir='out', extra_suffix='', input_nargs=0, backend='tf', args_range=None, sigmas_range=None, debug_ast=False, compiler_modes=None, select_rule=1, compute_g=True, autoscheduler=False, do_prune=None, par_vals=None, multiplication_rule=3, AD_only=False, allow_raymarching_random=False):
+def render_shader(objective_functor, is_color=default_is_color, base_dir='out', extra_suffix='', input_nargs=0, backend='tf', args_range=None, sigmas_range=None, debug_ast=False, compiler_modes=None, select_rule=1, compute_g=True, autoscheduler=False, do_prune=None, par_vals=None, multiplication_rule=3, AD_only=False, allow_raymarching_random=False, ndims=2):
     """
     Low-level routine for rendering a shader.
 
@@ -224,10 +224,19 @@ def render_shader(objective_functor, is_color=default_is_color, base_dir='out', 
     
     X = ArgumentArray(ndims=input_nargs)
     scalar_loss_scale = ArgumentArray(ndims=input_nargs, name='scalar_loss_scale')
-    u = ArgumentScalar(DEFAULT_ARGUMENT_SCALAR_U_NAME)
-    v = ArgumentScalar(DEFAULT_ARGUMENT_SCALAR_V_NAME)
     
-    f = objective_functor(u, v, X, scalar_loss_scale)
+    u = ArgumentScalar(DEFAULT_ARGUMENT_SCALAR_U_NAME)
+    tup = (u,)
+    
+    if ndims > 1:
+        v = ArgumentScalar(DEFAULT_ARGUMENT_SCALAR_V_NAME)
+        tup += (v,)
+        
+    if ndims > 2:
+        w = ArgumentScalar(DEFAULT_ARGUMENT_SCALAR_W_NAME)
+        tup += (w,)
+    
+    f = objective_functor(*tup, X, scalar_loss_scale)
     if isinstance(f, (list, tuple)):
         scalar_loss = f[1]
         f = f[0]
@@ -236,7 +245,7 @@ def render_shader(objective_functor, is_color=default_is_color, base_dir='out', 
         
     f.root = True
 
-    c = CompilerParams(input_nargs=input_nargs, backend=backend, args_range=args_range, sigmas_range=sigmas_range, debug_ast=debug_ast, select_rule=select_rule, multiplication_rule=multiplication_rule, compute_g=compute_g, autoscheduler=autoscheduler, do_prune=do_prune, par_vals=par_vals, gradient_mode='AD' if AD_only else 'ours', allow_raymarching_random=allow_raymarching_random)
+    c = CompilerParams(input_nargs=input_nargs, backend=backend, args_range=args_range, sigmas_range=sigmas_range, debug_ast=debug_ast, select_rule=select_rule, multiplication_rule=multiplication_rule, compute_g=compute_g, autoscheduler=autoscheduler, do_prune=do_prune, par_vals=par_vals, gradient_mode='AD' if AD_only else 'ours', allow_raymarching_random=allow_raymarching_random, ndims=ndims, is_color=is_color)
     if is_color:
         c.constructor_code = [OUTPUT_ARRAY + '.resize(3);']
 

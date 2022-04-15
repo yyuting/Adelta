@@ -330,6 +330,11 @@ from render_single import render_single
 compiler.log_prefix_only = False
 compiler.log_intermediates_less = True
 
+def cmd_template():
+    cmd = f"""python approx_gradient.py --shader test_finite_diff_ring_contour --init_values_pool apps/example_init_values/test_finite_diffring_contour_extra_init_values_pool.npy --metrics 5_scale_L2 --gt_file celtic_knot.png --render_size 640,640 --is_color --smoothing_sigmas 0.5,1,2,5 --multi_scale_optimization --alternating_times 5"""
+    
+    return cmd
+
 nrings = 10
 
 nargs = 4 * nrings + 2

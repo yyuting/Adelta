@@ -11,6 +11,11 @@ from render_single import render_single
 compiler.log_prefix_only = False
 compiler.log_intermediates_less = True
 
+def cmd_template():
+    cmd = f"""python approx_gradient.py --shader test_finite_diff_half_plane --init_values_pool apps/example_init_values/test_finite_diff_half_plane_init_values_pool.npy --metrics 5_scale_L2 --is_col"""
+    
+    return cmd
+
 nargs = 1
 args_range = np.array([600])
 args_constrain = [None, None]

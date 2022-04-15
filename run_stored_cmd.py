@@ -3,11 +3,10 @@ import sys
 
 default_path = '/n/fs/scratch/yutingy'
 
-"""
-Extracts and run the commands on top of each shader file to reproduce our result.
-"""
-
 def run(shader_file, path=None):
+    """
+    Extracts and run the commands on top of each shader file to reproduce our result.
+    """
     
     lines = open(shader_file).read().split('\n')
     
@@ -25,16 +24,4 @@ def run(shader_file, path=None):
             
         print(line)
         os.system(line)
-        
-def main():
-    if len(sys.argv) != 2:
-        print('Usage: python [shader_file]')
-        return
-    
-    shader_file = sys.argv[1]
-    
-    run(shader_file)
-        
-if __name__ == '__main__':
-    main()
-    
+       

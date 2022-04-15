@@ -45,6 +45,11 @@ from render_single import render_single
 compiler.log_prefix_only = False
 compiler.log_intermediates_less = True
 
+def cmd_template():
+    cmd = f"""python approx_gradient.py --shader test_finite_diff_ring --init_values_pool apps/example_init_values/test_finite_diff_ring_extra_init_values.npy --metrics 1_scale_L2 --render_size 256,256 --is_color --niters 100"""
+    
+    return cmd
+
 nargs = 8
 args_range = np.array([256., 256., 256., 100, 1., 1., 1., 1.])
 

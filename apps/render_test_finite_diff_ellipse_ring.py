@@ -2,7 +2,7 @@
 ------------------------------------------------------------------------------------------------------------------------------
 # visualize gradient
 
-python approx_gradient.py --dir /n/fs/scratch/yutingy/test_finite_diff_ellipse_ring --shader test_finite_diff_ellipse_ring --init_values_pool test_finite_diff_ellipse_ring.npy --modes visualize_gradient --metrics naive_sum --gradient_methods_optimization ours --learning_rate 0.01 --finite_diff_h 0.01 --finite_diff_both_sides --is_col --render_size 256,256 --aa_nsamples 1000
+python approx_gradient.py --dir /n/fs/scratch/yutingy/test_finite_diff_ellipse_ring --shader test_finite_diff_ellipse_ring --init_values_pool apps/example_init_values/test_finite_diff_ellipse_ring.npy --modes visualize_gradient --metrics naive_sum --gradient_methods_optimization ours --learning_rate 0.01 --finite_diff_h 0.01 --finite_diff_both_sides --is_col --render_size 256,256 --aa_nsamples 1000
 """
 
 from render_util import *
@@ -10,6 +10,12 @@ from render_single import render_single
 
 compiler.log_prefix_only = False
 compiler.log_intermediates_less = True
+
+def cmd_template():
+    
+    cmd = f"""python approx_gradient.py --shader test_finite_diff_ellipse_ring --init_values_pool apps/example_init_values/test_finite_diff_ellipse_ring.npy --metrics 1_scale_L2 --is_col --render_size 256,256"""
+    
+    return cmd
 
 nargs = 9
 args_range = np.array([256., 256., 256., 100., 1., 1., 1., 1., 1])

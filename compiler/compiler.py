@@ -68,6 +68,7 @@ LOCAL_ARRAY = 'producer_ans'
 
 DEFAULT_ARGUMENT_SCALAR_U_NAME = 'current_u'
 DEFAULT_ARGUMENT_SCALAR_V_NAME = 'current_v'
+DEFAULT_ARGUMENT_SCALAR_W_NAME = 'current_w'
 DEFAULT_ARGUMENT_SCALAR_OFFSET_U_NAME = 'Ou'
 DEFAULT_ARGUMENT_SCALAR_OFFSET_V_NAME = 'Ov'
 
@@ -142,8 +143,16 @@ def get_output_and_children(
     f_node, g_node, g_aux_nodes, g_AD_node, compiler_params = derivs_info
     
     if g_aux_nodes is not None:
-        g_neighbors, g_u, g_v, min_discont_denums = g_aux_nodes
-        masks_per_neighbor = [g_neighbors[idx][len(g_node.children)+1] for idx in range(4)]
+        g_neighbors, *deriv_aux, min_discont_denums = g_aux_nodes
+        g_u = deriv_aux[0]
+        if compiler_params.ndims > 1:
+            g_v = deriv_aux[1]
+        if compiler_params.ndims > 2:
+            g_w = deriv_aux[2]
+            
+        n_neighbors = 2 * compiler_params.ndims
+            
+        masks_per_neighbor = [g_neighbors[idx][len(g_node.children)+1] for idx in range(n_neighbors)]
     
     kernel_type = generate_kw.get('kernel_type', '')
     assert kernel_type in ['cont', 'bw']
@@ -283,7 +292,12 @@ def bw_schedule_builder(f_node, g_node, g_aux_nodes, g_AD_node, compiler_params,
                    'bw_type': seperate_neighbor}
 
     if g_aux_nodes is not None:
-        g_neighbors, g_u, g_v, min_discont_denums = g_aux_nodes
+        g_neighbors, *deriv_aux, min_discont_denums = g_aux_nodes
+        g_u = deriv_aux[0]
+        if compiler_params.ndims > 1:
+            g_v = deriv_aux[1]
+        if compiler_params.ndims > 2:
+            g_w = deriv_aux[2]
     
     # g_neibors: length 4 list for 4 neighbors
     # for each neighbor: [min_discont_denum, deriv_neighbor, mask_discont, extra_nodes]
@@ -472,6 +486,9 @@ class CompilerParams:
         self.check_varname = True               # If set True, always apply sanity check before generating varname
         
         self.allow_raymarching_random = False # If true, allow parameters that ray marching loops depend on also include random variables
+        
+        self.ndims = 2                      # The dimensionality of the problem
+        self.is_color = True                # Whether the problem has 3 channel or 1 channel output
         
         self.discont_params_idx = []
         self.cont_params_idx = []
@@ -958,7 +975,6 @@ def process_fw_node(e, compiler_params):
     e.calc_parents()
     print("calculate_parents_after_simplify_finished")
     
-
     if compiler_params.compute_g:
         
         if compiler_params.gradient_mode == 'AD':
@@ -2651,7 +2667,7 @@ def backprop(e, compiler_params, check_discont=False):
     if compiler_params.debug_ast:
         nneighbors = 1
     else:
-        nneighbors = 4
+        nneighbors = 2 * compiler_params.ndims
         
     all_pix_idx_pls = []
 
@@ -2675,31 +2691,68 @@ def backprop(e, compiler_params, check_discont=False):
     if compiler_params.debug_ast:
         derivs = deriv_neighbors[0]
     else:
-        min_discont_denums = [minimum(deriv_neighbors[0][0], deriv_neighbors[1][0]),
-                              minimum(deriv_neighbors[2][0], deriv_neighbors[3][0])]
-
-        choose_u = ChooseU((min_discont_denums[1] > 1e7) | 
-                           ((min_discont_denums[0] < 1e7) & (min_discont_denums[0] > min_discont_denums[1])))
+        min_discont_denums = []
+        for i in range(compiler_params.ndims):
+            min_discont_denums += [minimum(deriv_neighbors[2 * i][0], deriv_neighbors[2 * i + 1][0])]
+            
+        if compiler_params.ndims == 1:
+            choose_u = True
+        elif compiler_params.ndims == 2:
+            choose_u = ChooseU((min_discont_denums[1] > 1e7) | 
+                               ((min_discont_denums[0] < 1e7) & (min_discont_denums[0] > min_discont_denums[1])))
+        elif compiler_params.ndims == 3:
+            
+            denums = [select(min_discont_denums[0] < 1e7, min_discont_denums[0], -1.),
+                      select(min_discont_denums[1] < 1e7, min_discont_denums[1], -1.),
+                      select(min_discont_denums[2] < 1e7, min_discont_denums[2], -1.)]
+            
+            max_idx = select(denums[1] > denums[0], 1., 0.)
+            max_idx = select(denums[2] > maximum(denums[0], denums[1]), 2., max_idx)
+            
+            choose_u = max_idx == 0
+            choose_v = max_idx == 1
 
         compiler_params.choose_u = choose_u
-
+        
         derivs = []
         deriv_u = []
         deriv_v = []
+        deriv_w = []
         
         for i in range(1, nderivs):
             deriv_u.append(deriv_neighbors[0][i] + deriv_neighbors[1][i])
-            deriv_v.append(deriv_neighbors[2][i] + deriv_neighbors[3][i])
             
-            derivs.append(0.5 * select(choose_u, 
-                                       deriv_u[-1],
-                                       deriv_v[-1]))
+            if compiler_params.ndims > 1:
+                deriv_v.append(deriv_neighbors[2][i] + deriv_neighbors[3][i])
+            
+            if compiler_params.ndims > 2:
+                deriv_w.append(deriv_neighbors[4][i] + deriv_neighbors[5][i])
+                
+            if compiler_params.ndims == 1:
+                derivs.append(0.5 * deriv_u[-1])
+            elif compiler_params.ndims == 2:
+                derivs.append(0.5 * select(choose_u, 
+                                           deriv_u[-1],
+                                           deriv_v[-1]))
+            elif compiler_params.ndims == 3:
+                derivs.append(0.5 * select(choose_u, deriv_u[-1],
+                                           select(choose_v, deriv_v[-1], deriv_w[-1])))
+            else:
+                raise
+            
+        aux_derivs = [deriv_u]
+            
+        if compiler_params.ndims > 1:
+            aux_derivs += [deriv_v]
+        
+        if compiler_params.ndims > 2:
+            aux_derivs += [deriv_w]
             
     compiler_params.all_pix_idx_pls = all_pix_idx_pls
         
     DEFAULT_IS_DERIV = False
     
-    aux_nodes = [deriv_neighbors, deriv_u, deriv_v, min_discont_denums]
+    aux_nodes = [deriv_neighbors] + aux_derivs + [min_discont_denums]
 
     return e, derivs, aux_nodes
 
@@ -2872,8 +2925,15 @@ def to_source(schedule_and_buffer, compiler_params, f_node = None):
         
         if compiler_params.backend in ['tf', 'np', 'torch']:
             f_return = '\n' + 'return ' + f_node.to_source(compiler_params.as_mode(MODE_VARNAME))
+            
+            grid_names = DEFAULT_ARGUMENT_SCALAR_U_NAME
+            if compiler_params.ndims > 1:
+                grid_names += ', ' + DEFAULT_ARGUMENT_SCALAR_V_NAME
+            if compiler_params.ndims > 2:
+                grid_names += ', ' + DEFAULT_ARGUMENT_SCALAR_W_NAME
+            
             f_declare = f"""
-def f({DEFAULT_ARGUMENT_SCALAR_U_NAME}, {DEFAULT_ARGUMENT_SCALAR_V_NAME}, {DEFAULT_ARGUMENT_ARRAY_NAME}, f_log_intermediate, vec_output, width, height):
+def f({grid_names}, {DEFAULT_ARGUMENT_ARRAY_NAME}, f_log_intermediate, vec_output, width, height, depth):
     Ou = 0
     Ov = 0
     pix_idx = 0
@@ -3987,16 +4047,27 @@ HALIDE_REGISTER_GENERATOR(Shader, shader)
         
         X_str = ', '.join(['X' + str(i) for i in range(compiler_params.input_nargs)])
         
+        grid_str = 'current_u'
+        if compiler_params.ndims > 1:
+            grid_str += ', current_v'
+        if compiler_params.ndims > 2:
+            grid_str += ', current_w'
+            
+        if compiler_params.is_color:
+            nchannels = 3
+        else:
+            nchannels = 1
+        
         autograd_str = f"""
 class CompilerProblem(torch.autograd.Function):
 
     @staticmethod
-    def forward(ctx, current_u, current_v, {X_str}, width, height):
+    def forward(ctx, {grid_str}, {X_str}, width, height, depth):
         X = [{X_str}]
-        ans = f(current_u, current_v, X, [], [], width, height)
-        vec_output = ans[:3]
+        ans = f({grid_str}, X, [], [], width, height, depth)
+        vec_output = ans[:{nchannels}]
         
-        ctx.save_for_backward(current_u, current_v, torch.tensor(width).float(), torch.tensor(height).float(), *X, *ans)
+        ctx.save_for_backward({grid_str}, torch.tensor(width).float(), torch.tensor(height).float(), torch.tensor(depth).float(), *X, *ans)
         ctx.nargs = {compiler_params.input_nargs}
         
         return torch.stack(vec_output, -1)
@@ -4004,26 +4075,27 @@ class CompilerProblem(torch.autograd.Function):
     @staticmethod
     def backward(ctx, grad_output):
         trace = ctx.saved_tensors
-        current_u, current_v, width, height = trace[:4]
-        X = trace[4:4+ctx.nargs]
-        trace = trace[4+ctx.nargs:]
+        {grid_str}, width, height, depth = trace[:3 + {compiler_params.ndims}]
+        X = trace[3 + {compiler_params.ndims}:3 + {compiler_params.ndims}+ctx.nargs]
+        trace = trace[3 + {compiler_params.ndims}+ctx.nargs:]
         
         dL_dcol = []
-        for i in range(3):
+        for i in range({nchannels}):
             dL_dcol.append(grad_output[..., i])
         
-        grad_X = g(current_u, current_v, X, dL_dcol, trace, [], width, height)
+        grad_X = g({grid_str}, X, dL_dcol, trace, [], width, height, depth)
         grad = []
         
         for val in grad_X:
             #grad.append(torch.mean(val))
             # zero out boundary for safety
-            grad.append(torch.nn.functional.pad(val[:, 1:-1, 1:-1], (1, 1, 1, 1)))
+            grad.append(torch.nn.functional.pad(val[(slice(None),) + (slice(1, -1),) * {compiler_params.ndims}], 
+                                                (1,) * 2 * {compiler_params.ndims}))
             
         
-        assert not (ctx.needs_input_grad[0] or ctx.needs_input_grad[1] or ctx.needs_input_grad[-2] or ctx.needs_input_grad[-1]), "uv coordinate, width and height should not be tunable"
+        #assert not (ctx.needs_input_grad[0] or ctx.needs_input_grad[1] or ctx.needs_input_grad[-2] or ctx.needs_input_grad[-1]), "uv coordinate, width and height should not be tunable"
         
-        return tuple([None, None] +  grad + [None, None])
+        return tuple([None] * {compiler_params.ndims} +  grad + [None, None, None])
 
         """
         
@@ -4174,10 +4246,17 @@ def get_f_return_declare(compiler_params, lib_name, return_name, kernel_idx, bas
     if compiler_params.backend in ['tf', 'np', 'torch']:
 
         f_return = '\n' + 'return ' + return_name
+        
+        grid_names = DEFAULT_ARGUMENT_SCALAR_U_NAME
+        if compiler_params.ndims > 1:
+            grid_names += ', ' + DEFAULT_ARGUMENT_SCALAR_V_NAME
+        if compiler_params.ndims > 2:
+            grid_names += ', ' + DEFAULT_ARGUMENT_SCALAR_W_NAME
 
         if lib_name == 'fw':
+            
             f_declare = f"""
-def f({DEFAULT_ARGUMENT_SCALAR_U_NAME}, {DEFAULT_ARGUMENT_SCALAR_V_NAME}, {DEFAULT_ARGUMENT_ARRAY_NAME}, f_log_intermediate, vec_output, width, height):
+def f({grid_names}, {DEFAULT_ARGUMENT_ARRAY_NAME}, f_log_intermediate, vec_output, width, height, depth):
     Ou = 0
     Ov = 0
     pix_idx = 0
@@ -4186,7 +4265,7 @@ def f({DEFAULT_ARGUMENT_SCALAR_U_NAME}, {DEFAULT_ARGUMENT_SCALAR_V_NAME}, {DEFAU
         else:
             # for tf, we always assume there's only one BW kernel
             f_declare = f"""
-def g({DEFAULT_ARGUMENT_SCALAR_U_NAME}, {DEFAULT_ARGUMENT_SCALAR_V_NAME}, {DEFAULT_ARGUMENT_ARRAY_NAME}, {DL_DCOL_ARRAY}, output0, vec_output, width, height):
+def g({grid_names}, {DEFAULT_ARGUMENT_ARRAY_NAME}, {DL_DCOL_ARRAY}, output0, vec_output, width, height, depth):
     Ou = 0
     Ov = 0
     pix_idx = 0

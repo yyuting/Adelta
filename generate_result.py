@@ -8,7 +8,7 @@ from matplotlib import pyplot as plt
 from matplotlib.ticker import LogLocator, FixedLocator, NullFormatter, FixedFormatter, NullLocator, MaxNLocator
 import string
 import shutil
-import run_shader
+import run_stored_cmd
 
 ylim_thre = 0.1
 success_thre = 0.2
@@ -19,8 +19,15 @@ thre = 2
 cols = {'Ours': 'b',
         'FD': 'g',
         'SPSA': 'r',
-        'Ours_no_random': 'cyan',
+        'Ours_no_random': 'purple',
         'DVG': 'orange'}
+
+zorders = {'Ours': 1,
+           'FD': 2,
+           'SPSA': 3,
+           'Ours_no_random': 4,
+           'DVG': 5}
+           
 
 shader_files = [
     # DVG comparisons
@@ -171,7 +178,7 @@ datas = {
 table_header = """
 \\begin{tabular}{c|c|c|c|c|c|c|c|c}
 \\multirow{2}{*}{Shader} & \\multicolumn{4}{c|}{Med. Success Time} & \\multicolumn{4}{c}{Exp. Time to Success} \\\\ \\cline{2-9}
-                        &   Ours  &  O/wo & FD$^*$   &  SPSA$^*$  &  Ours  &  O/wo & FD$^*$      &  SPSA$^*$           \\\\ \\thickhline
+                        &   Ours  &  \\Owo & FD$^*$   &  SPSA$^*$  &  Ours  &  \\Owo & FD$^*$      &  SPSA$^*$           \\\\ \\thickhline
 """
 table_end = """
 \\end{tabular}
@@ -280,17 +287,17 @@ def draw_subplot(ax, shader, count, err_datas, success_median_times=None):
         iterations = np.arange(loss.shape[1]) + 1
 
         for idx in range(loss.shape[0]):
-            ax.plot(iterations * scale, loss[idx], cols[method], alpha=0.05)
+            ax.plot(iterations * scale, loss[idx], cols[method], alpha=0.05, zorder=zorders[method])
 
         median_val = get_median(loss)[0]
 
-        ax.plot(iterations * scale, median_val, 'w', alpha=0.5, linewidth=5)
-        ax.plot(iterations * scale, median_val, cols[method], label=label)
+        ax.plot(iterations * scale, median_val, 'w', alpha=0.5, linewidth=5, zorder=zorders[method])
+        ax.plot(iterations * scale, median_val, cols[method], label=label, zorder=zorders[method])
         
     if success_median_times is not None:
         for method in list(err_datas.keys())[::-1]:
             success_median_time = err_datas[method][3]
-            ax.scatter(success_median_time, current_thre, c=cols[method], zorder=200, s=50)
+            ax.scatter(success_median_time, current_thre, c=cols[method], s=50, zorder=200+zorders[method])
         
         #for idx in range(len(success_median_times)):
         #    ax.scatter(success_median_times[idx], thre, c=list(cols.values())[idx], zorder=200, s=50)
@@ -737,7 +744,7 @@ def generate_result():
     
 def collect_result():
     for file in shader_files:
-        run_shader.run(file, sys.argv[1])
+        run_stored_cmd.run(file, sys.argv[1])
 
 def main():
     
@@ -748,8 +755,8 @@ def main():
         error = True
         
     if error:
-        print('Usage: python generate_result [path] [mode]')
-        print('mode = [generate, collect]')
+        print('Usage: python generate_result <path> <mode>')
+        print('mode = {generate, collect}')
         return
     
     if sys.argv[2] == 'generate':

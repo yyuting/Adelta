@@ -241,6 +241,11 @@ from render_single import render_single
 compiler.log_prefix_only = False
 compiler.log_intermediates_less = True
 
+def cmd_check(backend):
+    print('The rope application is slightly different than the other shaders, and involves multiple stages of optimization. Use the following command to reproduce result:')
+    print('python run_shader.py render_test_finite_diff_quadratic_bezier_w_col_rotational_offset_quadratic_Z_optimized.py <path>')
+    raise
+
 nropes = 1
 all_nsplines = [6]
 

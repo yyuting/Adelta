@@ -67,6 +67,10 @@ def render_single(base_dir, shader_name, args, outdir=None, render_size=None):
     if '--allow_raymarching_random' in args:
         kw['allow_raymarching_random'] = True
         
+    if '--ndims' in args:
+        ndims_idx = args.index('--ndims')
+        kw['ndims'] = int(args[ndims_idx+1])
+        
     m = importlib.import_module(shader_name)
     
     shaders = m.shaders

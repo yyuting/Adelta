@@ -206,7 +206,7 @@ python approx_gradient.py --dir /n/fs/scratch/yutingy/test_finite_diff_raytracin
 ------------------------------------------------------------------------------------------------------------------------------
 # animation
 
-python approx_gradient.py --dir /n/fs/scratch/yutingy/test_finite_diff_raytracing_structured_tf_logo --shader test_finite_diff_raytracing_structured_tf_logo --init_values_pool test_finite_diff_structured_tf_logo_init_values_pool.npy --modes optimization --metrics 5_scale_L2 --gradient_methods_optimization ours --learning_rate 0.01 --finite_diff_h 0.01 --finite_diff_both_sides --render_size 640,640 --is_color --smoothing_sigmas 0.5,1,2,5 --multi_scale_optimization --alternating_times 5 --backend hl --quiet --tunable_param_random_var --tunable_param_random_var_opt --tunable_param_random_var_seperate_opt --tunable_param_random_var_opt_scheduling all --tunable_param_random_var_std 1 --quiet --no_reset_opt --no_binary_search_std --save_all_loss --gt_file tf_logo.png --gt_transposed --save_all_par --autoscheduler
+python approx_gradient.py --dir /n/fs/scratch/yutingy/test_finite_diff_raytracing_structured_tf_logo --shader test_finite_diff_raytracing_structured_tf_logo --init_values_pool apps/example_init_values/test_finite_diff_structured_tf_logo_init_values_pool.npy --modes optimization --metrics 5_scale_L2 --gradient_methods_optimization ours --learning_rate 0.01 --finite_diff_h 0.01 --finite_diff_both_sides --render_size 640,640 --is_color --smoothing_sigmas 0.5,1,2,5 --multi_scale_optimization --alternating_times 5 --backend hl --quiet --tunable_param_random_var --tunable_param_random_var_opt --tunable_param_random_var_seperate_opt --tunable_param_random_var_opt_scheduling all --tunable_param_random_var_std 1 --quiet --no_reset_opt --no_binary_search_std --save_all_loss --gt_file tf_logo.png --gt_transposed --save_all_par --autoscheduler
 
 # GLSL code
 
@@ -216,7 +216,7 @@ python approx_gradient.py --dir /n/fs/scratch/yutingy/test_finite_diff_raytracin
 
 python approx_gradient.py --dir /n/fs/scratch/yutingy/test_finite_diff_raytracing_structured_tf_logo --shader test_finite_diff_raytracing_structured_tf_logo --init_values_pool /n/fs/scratch/yutingy/test_finite_diff_raytracing_structured_tf_logo/ours_both_sides_5_scale_L2_adam_1.0e-02_result0_0.npy --modes render --metrics 5_scale_L2 --gradient_methods_optimization ours --learning_rate 0.01 --finite_diff_h 0.01 --finite_diff_both_sides --render_size 640,640 --is_color --smoothing_sigmas 0.5,1,2,5 --multi_scale_optimization --alternating_times 5 --backend hl --quiet --tunable_param_random_var --tunable_param_random_var_opt --tunable_param_random_var_seperate_opt --tunable_param_random_var_opt_scheduling all --tunable_param_random_var_std 1 --quiet --no_reset_opt --no_binary_search_std --save_all_loss --gt_file tf_logo.png --gt_transposed --save_best_par --save_all_par --suffix _opt --autoscheduler
 
-cd /n/fs/scratch/yutingy/test_finite_diff_raytracing_structured_tf_logo; ffmpeg -i init_opt%d.png -r 30 -c:v libx264 -preset slow -crf 0 -r 30 animation.mp4
+ffmpeg -i /n/fs/scratch/yutingy/test_finite_diff_raytracing_structured_tf_logo/init_opt%05d.png -r 30 -c:v libx264 -preset slow -crf 0 -r 30 /n/fs/scratch/yutingy/test_finite_diff_raytracing_structured_tf_logo/animation.mp4
 
 ------------------------------------------------------------------------------------------------------------------------------
 # Quantitative Metric using 2D box kernels
@@ -309,6 +309,11 @@ height = ArgumentScalar('height')
 
 compiler.log_prefix_only = False
 compiler.log_intermediates_less = True
+
+def cmd_template():
+    cmd = f"""python approx_gradient.py --shader test_finite_diff_raytracing_structured_tf_logo --init_values_pool apps/example_init_values/test_finite_diff_raymarching_structured_tf_logo_extra_init_values_pool.npy --metrics 5_scale_L2 --render_size 640,640 --is_color --smoothing_sigmas 0.5,1,2,5 --multi_scale_optimization --alternating_times 5 --gt_file tf_logo.png"""
+    
+    return cmd
 
 use_select_rule = 1
 

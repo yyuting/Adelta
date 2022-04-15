@@ -37,6 +37,13 @@ from render_single import render_single
 compiler.log_prefix_only = False
 compiler.log_intermediates_less = True
 
+def cmd_template():
+    
+    cmd = f"""python approx_gradient.py --shader test_finite_diff_quadrant --init_values_pool apps/example_init_values/test_finite_diff_quadrant_init_values.npy --metrics 1_scale_L2 --is_col --render_size 160,160"""
+    
+    return cmd
+
+
 nargs = 2
 args_range = np.array([320, 320])
 

@@ -14,6 +14,17 @@ from render_single import render_single
 compiler.log_prefix_only = False
 compiler.log_intermediates_less = True
 
+def cmd_check(backend):
+    if backend in ['hl', 'tf']:
+        print('Error! this shader cannot be compiled into %s backend' % backend)
+        raise
+
+def cmd_template():
+        
+    cmd = f"""python approx_gradient.py --shader test_finite_diff_3D_sphere --init_values_pool apps/example_init_values/test_finite_diff_3D_sphere_init_values.npy --metrics 5_scale_L2 --render_size 50,50,50 --ndims 3 --ignore_glsl"""
+    
+    return cmd
+
 nargs = 7
 args_range = np.ones(nargs)
 args_range[:4] = 10

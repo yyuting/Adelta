@@ -679,10 +679,10 @@ def visualize_gradient(deriv_img, gt_deriv_img, dir, prefix, is_color=False, sam
                 if same_scale:
                     deriv_vals_thre = gt_deriv_vals_thre
 
-            imsave(os.path.join(dir, '%s_deriv_%d.png' % (prefix, k)), np.clip(current_deriv_img / deriv_vals_thre, 0, 1), ndims=ndims)
+            imsave(os.path.join(dir, '%s_deriv_%d.png' % (prefix, k)), np.clip(current_deriv_img / deriv_vals_thre, 0, 1), ndims=max(ndims, 2))
 
             if gt_deriv_img is not None:
-                imsave(os.path.join(dir, '%s_gt_deriv_%d.png' % (prefix, k)), np.clip(current_gt_deriv_img / gt_deriv_vals_thre, 0, 1), ndims=ndims)
+                imsave(os.path.join(dir, '%s_gt_deriv_%d.png' % (prefix, k)), np.clip(current_gt_deriv_img / gt_deriv_vals_thre, 0, 1), ndims=max(ndims, 2))
             
 def generate_tensor(init_values, args_range=None, backend='tf', ndims=2):
 
@@ -3181,7 +3181,7 @@ def main():
                     gt_img = np.load(args.gt_file).astype(np.float32)
                     gt_name = os.path.join(args.dir, 'gt.npy')
                 
-                if ndims == 2 and args.gt_transposed:
+                if args.ndims == 2 and args.gt_transposed:
                     if args.is_color:
                         assert gt_img.shape[-1] == 3
                         gt_img = gt_img.transpose((1, 0, 2))
@@ -3416,9 +3416,7 @@ def main():
                             gradient_map = 0
 
                             deriv_denum = raw_output_valid
-                            
-                            loss_pixelwise_gradient = None
-                            
+                                                        
                             if follow_last:
                                 old_loss_pixelwise_gradient = loss_pixelwise_gradient * args.multi_scale_previous_loss_ratio
                                 loss_pixelwise_gradient = tf.gradients(tf.reduce_mean(current_term), deriv_denum)[0]
@@ -4355,12 +4353,13 @@ def main():
             
             if not args.ignore_glsl:
                 
-                if compiler_module.n_updates > 0:
+                if getattr(compiler_module, 'n_updates', 0) > 0:
                     do_prune = get_do_prune(metric, compiler_module, render_kw, best_par[:args_range.shape[0]])
                 else:
                     do_prune = None
                     
-                generate_interactive_frag(args, best_par[:args_range.shape[0]] * args_range, do_prune)
+                if best_par is not None:
+                    generate_interactive_frag(args, best_par[:args_range.shape[0]] * args_range, do_prune)
 
     
 if __name__ == '__main__':

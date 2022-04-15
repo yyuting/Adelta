@@ -150,8 +150,8 @@ python approx_gradient.py --dir /n/fs/scratch/yutingy/test_finite_diff_raymarchi
 # no random, same opt process as ours and FD
 # Runtime
 # Ours: 0.0072
-# SPSA: 0.0020
-# SPSA iter match ours runtime: 7200
+# SPSA: 0.0042
+# SPSA iter match ours runtime: 3429
 
 -------------------------
 # 1 sample (only runned with one choice of h to get a runtime estimate)
@@ -161,15 +161,15 @@ python approx_gradient.py --dir /n/fs/scratch/yutingy/test_finite_diff_raymarchi
 -------------------------
 # 1 sample iteration scaled by runtime
 
-python approx_gradient.py --dir /n/fs/scratch/yutingy/test_finite_diff_raymarching_siggraph_cone --shader test_finite_diff_raymarching_siggraph_cone --init_values_pool apps/example_init_values/test_finite_diff_siggraph_cone_extra_init_values_pool.npy --modes optimization --metrics 5_scale_L2 --gradient_methods_optimization finite_diff --learning_rate 0.01 --finite_diff_h 0.1 --finite_diff_both_sides --render_size 960,960 --is_color --smoothing_sigmas 0.5,1,2,5 --gt_file siggraph_gradient.png --gt_transposed --multi_scale_optimization --alternating_times 5 --suffix _from_real_no_random_fd_h_01_scaled_niter --save_all_loss --no_reset_opt --backend hl --quiet --autoscheduler --finite_diff_spsa_samples 1 --no_reset_sigma --niter 7200
+python approx_gradient.py --dir /n/fs/scratch/yutingy/test_finite_diff_raymarching_siggraph_cone --shader test_finite_diff_raymarching_siggraph_cone --init_values_pool apps/example_init_values/test_finite_diff_siggraph_cone_extra_init_values_pool.npy --modes optimization --metrics 5_scale_L2 --gradient_methods_optimization finite_diff --learning_rate 0.01 --finite_diff_h 0.1 --finite_diff_both_sides --render_size 960,960 --is_color --smoothing_sigmas 0.5,1,2,5 --gt_file siggraph_gradient.png --gt_transposed --multi_scale_optimization --alternating_times 5 --suffix _from_real_no_random_fd_h_01_scaled_niter --save_all_loss --no_reset_opt --backend hl --quiet --autoscheduler --finite_diff_spsa_samples 1 --no_reset_sigma --niter 3429
 
-python approx_gradient.py --dir /n/fs/scratch/yutingy/test_finite_diff_raymarching_siggraph_cone --shader test_finite_diff_raymarching_siggraph_cone --init_values_pool apps/example_init_values/test_finite_diff_siggraph_cone_extra_init_values_pool.npy --modes optimization --metrics 5_scale_L2 --gradient_methods_optimization finite_diff --learning_rate 0.01 --finite_diff_h 0.01 --finite_diff_both_sides --render_size 960,960 --is_color --smoothing_sigmas 0.5,1,2,5 --gt_file siggraph_gradient.png --gt_transposed --multi_scale_optimization --alternating_times 5 --suffix _from_real_no_random_fd_h_001_scaled_niter --save_all_loss --no_reset_opt --backend hl --quiet --autoscheduler --finite_diff_spsa_samples 1 --no_reset_sigma --niter 7200
+python approx_gradient.py --dir /n/fs/scratch/yutingy/test_finite_diff_raymarching_siggraph_cone --shader test_finite_diff_raymarching_siggraph_cone --init_values_pool apps/example_init_values/test_finite_diff_siggraph_cone_extra_init_values_pool.npy --modes optimization --metrics 5_scale_L2 --gradient_methods_optimization finite_diff --learning_rate 0.01 --finite_diff_h 0.01 --finite_diff_both_sides --render_size 960,960 --is_color --smoothing_sigmas 0.5,1,2,5 --gt_file siggraph_gradient.png --gt_transposed --multi_scale_optimization --alternating_times 5 --suffix _from_real_no_random_fd_h_001_scaled_niter --save_all_loss --no_reset_opt --backend hl --quiet --autoscheduler --finite_diff_spsa_samples 1 --no_reset_sigma --niter 3429
 
-python approx_gradient.py --dir /n/fs/scratch/yutingy/test_finite_diff_raymarching_siggraph_cone --shader test_finite_diff_raymarching_siggraph_cone --init_values_pool apps/example_init_values/test_finite_diff_siggraph_cone_extra_init_values_pool.npy --modes optimization --metrics 5_scale_L2 --gradient_methods_optimization finite_diff --learning_rate 0.01 --finite_diff_h 0.001 --finite_diff_both_sides --render_size 960,960 --is_color --smoothing_sigmas 0.5,1,2,5 --gt_file siggraph_gradient.png --gt_transposed --multi_scale_optimization --alternating_times 5 --suffix _from_real_no_random_fd_h_0001_scaled_niter --save_all_loss --no_reset_opt --backend hl --quiet --autoscheduler --finite_diff_spsa_samples 1 --no_reset_sigma --niter 7200
+python approx_gradient.py --dir /n/fs/scratch/yutingy/test_finite_diff_raymarching_siggraph_cone --shader test_finite_diff_raymarching_siggraph_cone --init_values_pool apps/example_init_values/test_finite_diff_siggraph_cone_extra_init_values_pool.npy --modes optimization --metrics 5_scale_L2 --gradient_methods_optimization finite_diff --learning_rate 0.01 --finite_diff_h 0.001 --finite_diff_both_sides --render_size 960,960 --is_color --smoothing_sigmas 0.5,1,2,5 --gt_file siggraph_gradient.png --gt_transposed --multi_scale_optimization --alternating_times 5 --suffix _from_real_no_random_fd_h_0001_scaled_niter --save_all_loss --no_reset_opt --backend hl --quiet --autoscheduler --finite_diff_spsa_samples 1 --no_reset_sigma --niter 3429
 
-python approx_gradient.py --dir /n/fs/scratch/yutingy/test_finite_diff_raymarching_siggraph_cone --shader test_finite_diff_raymarching_siggraph_cone --init_values_pool apps/example_init_values/test_finite_diff_siggraph_cone_extra_init_values_pool.npy --modes optimization --metrics 5_scale_L2 --gradient_methods_optimization finite_diff --learning_rate 0.01 --finite_diff_h 0.0001 --finite_diff_both_sides --render_size 960,960 --is_color --smoothing_sigmas 0.5,1,2,5 --gt_file siggraph_gradient.png --gt_transposed --multi_scale_optimization --alternating_times 5 --suffix _from_real_no_random_fd_h_00001_scaled_niter --save_all_loss --no_reset_opt --backend hl --quiet --autoscheduler --finite_diff_spsa_samples 1 --no_reset_sigma --niter 7200
+python approx_gradient.py --dir /n/fs/scratch/yutingy/test_finite_diff_raymarching_siggraph_cone --shader test_finite_diff_raymarching_siggraph_cone --init_values_pool apps/example_init_values/test_finite_diff_siggraph_cone_extra_init_values_pool.npy --modes optimization --metrics 5_scale_L2 --gradient_methods_optimization finite_diff --learning_rate 0.01 --finite_diff_h 0.0001 --finite_diff_both_sides --render_size 960,960 --is_color --smoothing_sigmas 0.5,1,2,5 --gt_file siggraph_gradient.png --gt_transposed --multi_scale_optimization --alternating_times 5 --suffix _from_real_no_random_fd_h_00001_scaled_niter --save_all_loss --no_reset_opt --backend hl --quiet --autoscheduler --finite_diff_spsa_samples 1 --no_reset_sigma --niter 3429
 
-python approx_gradient.py --dir /n/fs/scratch/yutingy/test_finite_diff_raymarching_siggraph_cone --shader test_finite_diff_raymarching_siggraph_cone --init_values_pool apps/example_init_values/test_finite_diff_siggraph_cone_extra_init_values_pool.npy --modes optimization --metrics 5_scale_L2 --gradient_methods_optimization finite_diff --learning_rate 0.01 --finite_diff_h 0.00001 --finite_diff_both_sides --render_size 960,960 --is_color --smoothing_sigmas 0.5,1,2,5 --gt_file siggraph_gradient.png --gt_transposed --multi_scale_optimization --alternating_times 5 --suffix _from_real_no_random_fd_h_000001_scaled_niter --save_all_loss --no_reset_opt --backend hl --quiet --autoscheduler --finite_diff_spsa_samples 1 --no_reset_sigma --niter 7200
+python approx_gradient.py --dir /n/fs/scratch/yutingy/test_finite_diff_raymarching_siggraph_cone --shader test_finite_diff_raymarching_siggraph_cone --init_values_pool apps/example_init_values/test_finite_diff_siggraph_cone_extra_init_values_pool.npy --modes optimization --metrics 5_scale_L2 --gradient_methods_optimization finite_diff --learning_rate 0.01 --finite_diff_h 0.00001 --finite_diff_both_sides --render_size 960,960 --is_color --smoothing_sigmas 0.5,1,2,5 --gt_file siggraph_gradient.png --gt_transposed --multi_scale_optimization --alternating_times 5 --suffix _from_real_no_random_fd_h_000001_scaled_niter --save_all_loss --no_reset_opt --backend hl --quiet --autoscheduler --finite_diff_spsa_samples 1 --no_reset_sigma --niter 3429
 
 -------------------------
 # half sample as FD: 22 samples
@@ -292,6 +292,10 @@ from render_single import render_single
 compiler.log_prefix_only = False
 compiler.log_intermediates_less = True
 
+def cmd_template():
+    cmd = f"""python approx_gradient.py --shader test_finite_diff_raymarching_siggraph_cone --init_values_pool apps/example_init_values/test_finite_diff_siggraph_cone_extra_init_values_pool.npy --metrics 5_scale_L2 --render_size 960,960 --is_color --smoothing_sigmas 0.5,1,2,5 --gt_file siggraph_gradient.png --multi_scale_optimization --alternating_times 5"""
+    return cmd
+
 check_intersect_thre = 0.01
 
 nargs = 43
@@ -303,16 +307,7 @@ args_range = np.array([0.5] * 8 + [0.1] * 4 + [0.02] + [0.1] * 2 + [1] * 28)
 width = ArgumentScalar('width')
 height = ArgumentScalar('height')
 
-raymarching_loop = 16
-# y = select(cond, a, b)
-# use_select_rule = 0:
-# dy/dtheta = (a - b) + select(xor(cond, cond changed state), da/dtheta, db/dtheta)
-# use_select_rule = 1:
-# dy/dtheta = (a - b)_neighbor = select(cond, da/dtheta, db/dtheta)
-# use_select_rule = 2:
-# dy/dtheta = (a - b) + select(cond, da/dtheta, db/dtheta)
-# use_select_rule = 3:
-# dy/dtheta = select(cond, da/dtheta, db/dtheta)
+raymarching_loop = 64
 use_select_rule = 1
 
 form_ellipse_ratio = 0

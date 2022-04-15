@@ -35,12 +35,13 @@ from render_single import render_single
 compiler.log_prefix_only = False
 compiler.log_intermediates_less = True
 
+def cmd_template():
+    cmd = f"""python approx_gradient.py --shader test_finite_diff_rectangle_2step --init_values_pool apps/example_init_values/test_finite_diff_rectangle_init_values.npy --metrics naive_sum --is_col --camera_size 960,640 --render_size 320,320 --tile_offset 390,100"""
+    
+    return cmd
+
 nargs = 5
 args_range = np.array([600, 600, 600, 600, 6.29])
-
-approx_mode = '1D_2samples'
-
-use_select_rule = 1
 
 def test_finite_diff_rectangle_2step(u, v, X, width=960, height=640):
     """

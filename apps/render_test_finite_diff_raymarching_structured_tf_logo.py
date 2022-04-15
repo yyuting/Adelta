@@ -136,7 +136,7 @@ python approx_gradient.py --dir /n/fs/scratch/yutingy/test_finite_diff_raymarchi
 
 # animation
 
-python approx_gradient.py --dir /n/fs/scratch/yutingy/test_finite_diff_raymarching_structured_tf_logo_updated --shader test_finite_diff_raymarching_structured_tf_logo --init_values_pool test_finite_diff_structured_tf_logo_init_values_pool.npy --modes optimization --metrics 5_scale_L2 --gradient_methods_optimization ours --learning_rate 0.01 --finite_diff_h 0.01 --finite_diff_both_sides --render_size 640,640 --is_color --smoothing_sigmas 0.5,1,2,5 --gt_file tf_logo.png --gt_transposed --suffix _animation --save_all_par --no_reset_opt --backend hl --quiet --multi_scale_optimization --autoscheduler --alternating_times 5
+python approx_gradient.py --dir /n/fs/scratch/yutingy/test_finite_diff_raymarching_structured_tf_logo_updated --shader test_finite_diff_raymarching_structured_tf_logo --init_values_pool apps/example_init_values/test_finite_diff_structured_tf_logo_init_values_pool.npy --modes optimization --metrics 5_scale_L2 --gradient_methods_optimization ours --learning_rate 0.01 --finite_diff_h 0.01 --finite_diff_both_sides --render_size 640,640 --is_color --smoothing_sigmas 0.5,1,2,5 --gt_file tf_logo.png --gt_transposed --suffix _animation --save_all_par --no_reset_opt --backend hl --quiet --multi_scale_optimization --autoscheduler --alternating_times 5
 
 python approx_gradient.py --dir /n/fs/scratch/yutingy/test_finite_diff_raymarching_structured_tf_logo_updated --shader test_finite_diff_raymarching_structured_tf_logo --init_values_pool /n/fs/scratch/yutingy/test_finite_diff_raymarching_structured_tf_logo_updated/ours_both_sides_5_scale_L2_adam_1.0e-02_animation_result2_0.npy --modes render --metrics 5_scale_L2 --gradient_methods_optimization ours --learning_rate 0.01 --finite_diff_h 0.01 --finite_diff_both_sides --render_size 640,640 --is_color --smoothing_sigmas 0.5,1,2,5 --gt_file tf_logo.png --gt_transposed --suffix _animation --save_all_par --no_reset_opt --backend hl --quiet --multi_scale_optimization --autoscheduler --alternating_times 5 --suffix _opt
 
@@ -226,6 +226,12 @@ python metric_compare_line_integral.py --baseline_dir /n/fs/scratch/yutingy/test
 
 from render_util import *
 from render_single import render_single
+
+def cmd_template():
+    cmd = f"""python approx_gradient.py --shader test_finite_diff_raymarching_structured_tf_logo --init_values_pool apps/example_init_values/test_finite_diff_raymarching_structured_tf_logo_extra_init_values_pool.npy --metrics 5_scale_L2 --render_size 640,640 --is_color --smoothing_sigmas 0.5,1,2,5 --gt_file tf_logo.png --multi_scale_optimization --alternating_times 5"""
+    
+    return cmd
+
 
 nargs = 31
 

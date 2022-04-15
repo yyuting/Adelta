@@ -11,6 +11,12 @@ from render_single import render_single
 compiler.log_prefix_only = False
 compiler.log_intermediates_less = True
 
+def cmd_template():
+    
+    cmd = f"""python approx_gradient.py --shader test_finite_diff_ellipse --init_values_pool apps/example_init_values/test_finite_diff_ellipse.npy --metrics 1_scale_L2 --is_col --render_size 256,256"""
+    
+    return cmd
+
 nargs = 8
 args_range = np.array([256., 256., 256., 1., 1., 1., 1., 1])
 

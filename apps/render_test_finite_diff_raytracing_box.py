@@ -21,6 +21,12 @@ from render_single import render_single
 compiler.log_prefix_only = False
 compiler.log_intermediates_less = True
 
+def cmd_template():
+    cmd = f"""python approx_gradient.py --shader test_finite_diff_raytracing_box --init_values_pool apps/example_init_values/test_finite_diff_raymarching_box_init_values_pool.npy --metrics 5_scale_L2 --render_size 640,640 --is_color --smoothing_sigmas 0.5,1,2,5 --multi_scale_optimization --alternating_times 5"""
+    
+    return cmd
+
+
 nargs = 20
 
 args_range = np.ones(nargs)

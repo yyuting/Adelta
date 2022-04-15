@@ -53,13 +53,17 @@ def get_neighbor(*args):
     if pix_idx == 0:
         return node
     elif pix_idx == 1:
-        return torch.roll(node, -1, dims=2)
+        return torch.roll(node, -1, dims=-1)
     elif pix_idx == 2:
-        return torch.roll(node, 1, dims=2)
+        return torch.roll(node, 1, dims=-1)
     elif pix_idx == 3:
-        return torch.roll(node, -1, dims=1)
+        return torch.roll(node, -1, dims=-2)
     elif pix_idx == 4:
-        return torch.roll(node, 1, dims=1)
+        return torch.roll(node, 1, dims=-2)
+    elif pix_idx == 5:
+        return torch.roll(node, -1, dims=-3)
+    elif pix_idx == 6:
+        return torch.roll(node, 1, dims=-3)
     else:
         raise
         
