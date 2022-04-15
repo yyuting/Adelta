@@ -47,7 +47,7 @@ compile_cmds = [
 
 def main():
     if len(sys.argv) != 3:
-        print('Usage: python script_compile_halide.py [halide_path] [build_path]')
+        print('Usage: python script_compile_halide.py <halide_path> <build_path>')
         print('eg: python script_compile_halide.py /n/fs/shaderml/Halide_binary/Halide-10.0.0-x86-64-linux /n/fs/scratch/yutingy/Halide')
         return
 
