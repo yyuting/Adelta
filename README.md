@@ -33,7 +33,12 @@ To reproduce our result, you need to first set up the Halide backend. Because we
     
 ### Exploring shader examples
 
-apps/run_shader.py provides an interface to explore our shader examples. It can be used to visualize the gradient of each shader, and apply optimization tasks to these shaders in all three backends: Halide, Tensorflow and Pytorch. Because our compiler write the compiled program to the save directory with the same naming scheme, different shaders should specify different dir argument.
+apps/run_shader.py provides an interface to explore our shader examples. It can be used to visualize the gradient of each shader, and apply optimization tasks to these shaders in all three backends: Halide, Tensorflow and Pytorch. For example, visualize the gradient of a rectangle shader using Pytorch backend:
+
+    cd apps
+    python run_shader.py render_test_finite_diff_rectangle_2step.py --dir <dir_rectangle> --backend torch --mode visualize_gradient
+
+Because our compiler write the compiled program to the save directory with the same naming scheme, different shaders should specify different dir argument. Argument details for run_shader.py is listed below.
 
 ```
 usage: run_shader.py [-h] [--dir DIR] [--mode {visualize_gradient,optimization}] [--backend {hl,tf,torch}]
