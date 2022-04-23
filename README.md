@@ -2,7 +2,7 @@
 
 ## Package dependencies
 
-The source code is developed and tested under python 3.6, Halide 10.0, TensorFlow 1.14 and Pytorch 1.10.2 with CUDA 10.0. A full list of python environment can be found in environment.yml.
+The source code is developed and tested under python 3.6, Halide 10.0, TensorFlow 2.6.2 and Pytorch 1.10.2. A full list of python environment can be found in environment.yml.
 
 ## Reproducing figures and tables in the paper
 
@@ -71,7 +71,7 @@ optional arguments:
 
 #### 1D and 3D examples
 
-We additionally provide toy examples for a 1D pulse and a 3D sphere. The 1D or 3D shaders can only be compiled to Pytorch backend. To run simple optimization task on these examples, run
+We additionally provide toy examples for a 1D pulse and a 3D sphere. The 1D or 3D shaders can only be compiled to TensorFlow and Pytorch backends. To run simple optimization task on these examples, run
 
 ```
 cd apps
@@ -83,3 +83,5 @@ python run_shader.py render_test_finite_diff_3D_sphere.py <dir_3D_sphere> --back
 We provide three different backend for generating the gradient program (Halide, TensorFlow, Pytorch). 
 
 Halide is used for all the experiments reported in our paper. It also supports comparison with baselines finite difference and SPSA.
+
+Both TensorFlow and Pytorch backends are used for our gradient only. We additionally include the 1D and 3D examples for these two backends. Note the TensorFlow backend allows eager execution under "visualize_gradient" mode, but resorts to the legacy 1.x style compute graph implementation under "optimization" mode.
