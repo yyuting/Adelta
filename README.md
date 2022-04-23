@@ -78,3 +78,8 @@ cd apps
 python run_shader.py render_test_finite_diff_1D_pulse.py <dir_1D_pulse> --backend torch --mode optimization
 python run_shader.py render_test_finite_diff_3D_sphere.py <dir_3D_sphere> --backend torch --mode optimization
 ```
+### A note on backends
+
+We provide three different backend for generating the gradient program (Halide, TensorFlow, Pytorch). 
+
+Halide is used for all the experiments reported in our paper. It also supports comparison with baselines finite difference and SPSA.
