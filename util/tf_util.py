@@ -39,11 +39,11 @@ def new_mul(x, y):
             y = tf.cast(y, x.dtype)
         
     except:
-        if x == True:
+        if x is True:
             return y
-        if y == True:
+        if y is True:
             return x
-        if x == False or y == False:
+        if x is False or y is False:
             return False
     return tf.multiply(x, y)
 
@@ -106,12 +106,12 @@ def select_nosmooth(a, b, c):
         else:
             return b if a else c
 
-    if base_tensor == a and count == 1:
+    if base_tensor is a and count == 1:
         if isinstance(b, (bool, np.bool_)) and isinstance(c, (bool, np.bool_)):
             actual_dtype = tf.bool
         else:
             actual_dtype = dtype
-    elif base_tensor != a:
+    elif base_tensor is not a:
         actual_dtype = base_tensor.dtype
     else:
         if isinstance(b, tf.Tensor):
@@ -135,9 +135,6 @@ def select_nosmooth(a, b, c):
                 c = tf.ones_like(base_tensor, dtype=actual_dtype)
             else:
                 c = c * tf.ones_like(base_tensor, dtype=actual_dtype)
-                
-    if tag_discontinuous and isinstance(a, tf.Tensor):
-        a.discontinuous = True
         
     return tf.where(tf.cast(a, bool), b, c)
 

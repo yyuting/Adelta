@@ -340,6 +340,9 @@ def nscale_metric_functor(nscale, base_metric, smoothing_sigmas=None, axis=None,
         current_scale = nscale - 1
         if smoothing_sigmas is not None:
             current_scale += len(smoothing_sigmas)
+            len_sigma = len(smoothing_sigmas)
+        else:
+            len_sigma = 0
         scale = extra_args.get('scale', current_scale)
         
         for i in range(nscale):
@@ -354,7 +357,7 @@ def nscale_metric_functor(nscale, base_metric, smoothing_sigmas=None, axis=None,
                 else:
                     raise
                 
-            if (backend == 'torch' and scale < current_scale) or (current_scale + ignore_last_n_scale >= nscale):
+            if (backend == 'torch' and scale < current_scale) or (current_scale + ignore_last_n_scale >= nscale + len_sigma):
                 pass
             else:
                 current_loss = base_metric(x, y, {'backend': backend})
@@ -448,6 +451,7 @@ def nscale_metric_functor(nscale, base_metric, smoothing_sigmas=None, axis=None,
                     current_scale -= 1
         return loss
     return func    
+
 
 metric = naive_sum
 
@@ -735,35 +739,39 @@ def generate_tensor(init_values, args_range=None, backend='tf', ndims=2):
     for n in range(var_initializer.shape[0]):
         param = tunable_params[n]
         X_orig.append(param * ones_like_pl * args_range[n])
+        
     
-    if backend == 'tf':
-        assign_init_pl = tf.placeholder(dtype, var_initializer.shape[0])
-        assign_ops = []
-        for n in range(var_initializer.shape[0]):
-            assign_ops.append(tf.assign(tunable_params[n], assign_init_pl[n]))
-        assign_ops = tf.group(*assign_ops)
+        
+    def set_par_functor(sess=None):
+        
+        if sess is not None:
+            assign_init_pl = tf.compat.v1.placeholder(dtype, var_initializer.shape[0])
+            assign_op = tunable_params.assign(assign_init_pl)
 
-        def set_par_functor(sess):
-            def f(par, dummy_last_dim=0):
-                if dummy_last_dim > 0:
-                    par = par[:-dummy_last_dim]
-                sess.run(assign_ops, feed_dict={assign_init_pl: par})
-            return f
-    else:
-        def set_par_functor():
+        nonlocal ones_like_pl, init_values
+
+        def f(par, dummy_last_dim=0):
+
+            X_orig = []
             
-            nonlocal ones_like_pl
+            if dummy_last_dim > 0:
+                par = par[:-dummy_last_dim]
             
-            def f(par, reset_var=True):
+            if sess is not None:
+                sess.run(assign_op, feed_dict={assign_init_pl: par})
+            else:
+                if backend == 'tf':
+                    tunable_params.assign(par)
+            
+            for n in range(init_values.shape[0]):
+                if backend == 'torch':
+                    tunable_params[n].data = torch.tensor(par[n], dtype=torch.float32, device='cuda')
                 
-                X_orig = []
-                #tunable_params.data = torch.tensor(par, dtype=torch.float32, device='cuda')
-                for n in range(len(tunable_params)):
-                    if reset_var:
-                        tunable_params[n].data = torch.tensor(par[n], dtype=torch.float32, device='cuda')
+                if sess is None:
                     X_orig.append(tunable_params[n] * args_range[n] * ones_like_pl)
-                return X_orig
-            return f
+            return X_orig
+        return f
+    
     
     return uv + [X_orig], set_par_functor, tunable_params
     
@@ -901,10 +909,6 @@ def main():
     parser.add_argument('--deriv_metric_curve_type', dest='deriv_metric_curve_type', default='line', help='specifies the curve type allowed for line integral, supports line (straight line) and piecewise (piecewise linear)')
     parser.add_argument('--deriv_metric_max_halflen', dest='deriv_metric_max_halflen', type=float, default=0.1, help='specifies the maximum half length of the line integral')
     parser.add_argument('--use_cpu', dest='use_cpu', action='store_true', help='if specified, disable gpu and use cpu instead')
-    parser.add_argument('--benchmark', dest='benchmark', action='store_true', help='if specified, benchmark runtime for backward pass')
-    parser.add_argument('--benchmark_fw_only', dest='benchmark_fw_only', action='store_true', help='if specified, benchmark only the runtime for forward pass')
-    parser.add_argument('--bechmark_samples', dest='benchmark_samples', type=int, default=10, help='specifies the number of samples run for the benchmark')
-    parser.add_argument('--benchmard_iters', dest='benchmark_iters', type=int, default=10, help='specifies the number of iterations per sample')
     parser.add_argument('--deriv_metric_suffix', dest='deriv_metric_suffix', default='', help='specifies suffix to the name of deriv metric files')
     parser.add_argument('--deriv_metric_record_choose_u', dest='deriv_metric_record_choose_u', action='store_true', help='if specified, record whether to choose u or v for current pixel')
     parser.add_argument('--render_shifted', dest='render_shifted', action='store_true', help='if specified, render rhs with shifted sites')
@@ -920,7 +924,6 @@ def main():
     parser.add_argument('--deriv_metric_per_sample', dest='deriv_metric_per_sample', action='store_true', help='if specified, instead of computing deriv_metric on the avg of samples, compute a seperate metric per sample')
     parser.add_argument('--quiet', dest='verbose', action='store_false', help='if specified, minimize printout')
     parser.add_argument('--preload_deriv', dest='preload_deriv', action='store_true', help='if specified, in scipy opt mode, precompute deriv in f() and fetch it later in g()')
-    parser.add_argument('--use_tf_opt', dest='use_tf_opt', action='store_true', help='if specified, use tf for optimization whenever possible')
     parser.add_argument('--random_uniform_uv_offset', dest='random_uniform_uv_offset', type=float, default=0, help='if nonzero, use this value to randomly offset every pixel center')
     parser.add_argument('--no_reset_sigma', dest='reset_sigma', action='store_false', help='if specified, do not reset sigma at the beginning of each traversal')
     parser.add_argument('--autoscheduler', dest='autoscheduler', action='store_true', help='if specified, use autoscheduler to find the best schedule, otherwise, use whatever default in compiler.py')
@@ -1361,9 +1364,6 @@ def main():
                     compiler_module.sigmas_scale = args.tunable_param_random_var_std
 
             if args.backend in ['tf', 'torch']:
-            
-                if args.backend == 'tf':
-                    tf.reset_default_graph()
 
                 vec_output = [None] * 3
                 trace = [None] * compiler_module.f_log_intermediate_len
@@ -1388,123 +1388,12 @@ def main():
 
                 random_var_opt_len = 0
 
-                if args.tunable_param_random_var:
+                random_var_scale_opt = None
+                random_noise_lookup = {}
 
-
-                    random_var_scale = tf.Variable(np.ones(len(random_var_indices)), dtype=tf.float32, trainable=False)
-                    random_var_scale_pl = tf.placeholder(tf.float32, len(random_var_indices))
-                    random_var_scale_assign = tf.assign(random_var_scale, random_var_scale_pl)
-
-                    random_var_switch = tf.Variable(1.0, dtype=tf.float32, trainable=False)
-                    random_var_switch_pl = tf.placeholder(tf.float32, ())
-                    random_var_switch_assign = tf.assign(random_var_switch, random_var_switch_pl)
-
-                    def func(sess, state):
-                        if isinstance(state, bool):
-                            if state:
-                                sess.run(random_var_switch_assign, feed_dict={random_var_switch_pl: 1.0})
-                            else:
-                                sess.run(random_var_switch_assign, feed_dict={random_var_switch_pl: 0.0})          
-                        else:
-                            sess.run(random_var_scale_assign, feed_dict={random_var_scale_pl: state})
-
-                    set_random_var = func
-
-
-
-                    if args.tunable_param_random_var_opt:
-                        if args.tunable_param_random_var_seperate_opt:
-                            random_var_scale_opt = tf.Variable(np.ones(len(random_var_indices)), dtype=tf.float32, trainable=True)
-                            random_var_opt_len = len(random_var_indices)
-                        else:
-                            random_var_scale_opt = tf.Variable(np.ones(1), dtype=tf.float32, trainable=True)
-                            random_var_opt_len = 1
-
-                        random_var_scale_opt_pl = tf.placeholder(tf.float32, random_var_scale_opt.shape)
-                        random_var_scale_opt_assign = tf.assign(random_var_scale_opt, random_var_scale_opt_pl)
-
-
-                        def func2(sess, val):
-                            sess.run(random_var_scale_opt_assign, feed_dict={random_var_scale_opt_pl: val})
-
-                        set_random_var_opt = func2
-                    else:
-                        random_var_scale_opt = 1.0
-
-                    base_idx_offset = 0
-
-
-                    for i in range(len(random_var_indices)):
-                        idx = random_var_indices[i]
-                        
-                        if args.debug_mode:
-                            
-                            extra_size = valid_start_idx - valid_end_idx
-                            
-                            if args.halide_so_dir != '':
-                            
-                                Halide_lib.load_so(args.halide_so_dir)
-                                
-                                par_len = init_values_pool.shape[1] - 1
-                                
-                                noise_buf = Halide_lib.so_lib.Buffer((default_width + extra_size, 
-                                                                      default_height + extra_size, 
-                                                                      par_len))
-                                noise_buf.set_min((-valid_start_idx, -valid_start_idx))
-                                noise_arr = np.asarray(noise_buf)
-                                
-                                noise_val = tf.placeholder(dtype, (len(random_var_indices),
-                                                                   default_height + extra_size,
-                                                                   default_width + extra_size))
-                                
-                                def get_noise(params):
-                                    global frame_idx
-                                    Halide_lib.so_lib.siggraph_lighting_noise_only(noise_buf, params, 
-                                                                                   tile_offset[0], tile_offset[1],
-                                                                                   default_width, default_height,
-                                                                                   0);
-                                    noise_buf.copy_to_host()
-                                    
-                                    ans = np.transpose(noise_arr[..., np.asarray(random_var_indices) - 3], (2, 1, 0))
-                                    
-                                    return ans
-                                
-                                random_noise_lookup[idx] = get_noise(init_values_pool[0, 1:])[i:i+1]
-                                
-                            else:
-                                X_shape = [int(val) for val in X[idx].shape]
-                                random_noise_lookup[idx] = random_var_switch * random_var_scale[i] * args.tunable_param_random_var_std * np.random.normal(size=X_shape) * args_range[idx-base_idx_offset]
-                        else:
-                            random_noise_lookup[idx] = random_var_switch * random_var_scale[i] * args.tunable_param_random_var_std * tf.random_normal(X[idx].shape) * args_range[idx-base_idx_offset]
-
-                        if args.tunable_param_random_var_seperate_opt:
-                            X[idx] = X[idx] + random_var_scale_opt[i] * random_noise_lookup[idx]
-                            if X != X_orig:
-                                X_orig[idx] = X_orig[idx] + random_var_scale_opt[i] * random_noise_lookup[idx]
-                        else:
-                            X[idx] = X[idx] + random_var_scale_opt[i] * random_noise_lookup[idx]
-                            if X != X_orig:
-                                X_orig[idx] = X_orig[idx] + random_var_scale_opt[i] * random_noise_lookup[idx]
-
-                else:
-                    random_var_scale_opt = None
-                    random_noise_lookup = {}
-
-                if args.backend == 'tf':
-                    sess = tf.Session()
-                    sess.run(tf.local_variables_initializer())
-                    sess.run(tf.global_variables_initializer()) 
-
-                    set_par = set_par_functor(sess)
-                    with tf.name_scope('forward') as scope:
-                        trace = compiler_module.f(*params_orig[:-1], X_orig, trace, vec_output, camera_width, camera_height, camera_depth)
-                else:
-                    # when visualizing gradient, do not use the cusomitized operator
-                    # treat fw and bw as regular python functions
-                    # because pytorch does not provide API for computing the gradient map
-                    trace = compiler_module.f(*params_orig[:-1], X_orig, trace, vec_output, camera_width, camera_height, camera_depth)
-                    set_par = set_par_functor()
-
+                set_par = set_par_functor()
+                trace = compiler_module.f(*params_orig[:-1], X_orig, trace, vec_output, camera_width, camera_height, camera_depth)
+                   
                 vec_output = trace[:3]
                     
                 if args.backend == 'tf':
@@ -1560,7 +1449,7 @@ def main():
                     gt_img = gt_img.transpose((1, 0, 2))
             else:
                 if args.backend == 'tf':
-                    gt_img = sess.run(output_valid[0], feed_dict=feed_dict)
+                    gt_img = output_valid[0].numpy()
                 elif args.backend == 'torch':
                     gt_img = output_valid[0].cpu().detach().numpy()
                 elif args.backend == 'hl':
@@ -1608,23 +1497,15 @@ def main():
                         dL_dcol = [dL_dcol] * 3
                     else:
                         dL_dcol = [dL_dcol]
-
-
-                    if args.backend == 'tf':
-                        with tf.name_scope('backward') as scope:
-                            param_gradients = compiler_module.g(*params_orig[:-1], X_orig, dL_dcol, trace, [], camera_width, camera_height, camera_depth)
-                        param_gradients = tf.concat(param_gradients, 0)
-                        all_ops = tf.get_default_graph().get_operations()
                         
-                        forward_ops = [op for op in all_ops if op.name.startswith('forward') and op.type not in invalid_op_types]
-                        backward_ops = [op for op in all_ops if op.name.startswith('backward') and op.type not in invalid_op_types]
-                        param_gradients *= np.expand_dims(np.expand_dims(args_range, -1), -1) 
+                    param_gradients = compiler_module.g(*params_orig[:-1], X_orig, dL_dcol, trace, [], camera_width, camera_height, camera_depth)
 
-                        print('forward ops:', len(forward_ops))
-                        print('backward ops:', len(backward_ops))
+
+                    if args.backend == 'tf':                            
+                        param_gradients = tf.concat(param_gradients, 0).numpy()
+                        param_gradients *= np.expand_dims(np.expand_dims(args_range, -1), -1) 
                     else:
-                        param_gradients = compiler_module.g(*params_orig[:-1], X_orig, dL_dcol, trace, [], camera_width, camera_height, camera_depth)
-                        param_gradients = [param_gradients[i].cpu().detach().numpy() * args_range[i] for i in range(len(param_gradients))]
+                        param_gradients = np.concatenate([param_gradients[i].cpu().detach().numpy() * args_range[i] for i in range(len(param_gradients))], 0)
 
                 else:
                     def halide_get_derivs(params, render_kw={}):
@@ -1716,12 +1597,7 @@ def main():
                     if uv_update is not None:
                         render_kw['uv_offset'] = uv_update
                     return halide_fw(p_update * args_range, render_kw={})
-                        
-                
-                #set_par(p_start)
-                #img_a = get_img()
-                #set_par(p_end)
-                #img_b = get_img()
+
                 
                 img_a = get_img(p_start)
                 img_b = get_img(p_end)
@@ -1919,8 +1795,6 @@ def main():
                                         else:
                                             render_pos = p_end
 
-                                        #set_par(render_pos + par_sample)
-                                        #endpoint_imgs[pos_idx][0] += get_img()
                                         
                                         endpoint_imgs[pos_idx][0] += get_img(render_pos + par_sample)
                                 else:
@@ -2273,19 +2147,8 @@ def main():
                         imsave(os.path.join(args.dir, 'init%s%05d.png' % (args.suffix, render_count)), img, args.backend == 'hl', ndims=args.ndims)
                         render_count += 1
                 else:
-                    if args.backend == 'tf':
-
-                        set_par(normalized_init_values)
-
-                        img = sess.run(output_orig)
-                    elif args.backend == 'torch':
-                        X_orig = set_par(normalized_init_values)
-                        trace = compiler_module.f(*params_orig[:-1], X_orig, trace, vec_output, camera_width, camera_height, camera_depth)
-                        if args.is_color:
-                            img = torch.stack(trace[:3], -1)[0].cpu().detach().numpy()
-                        else:
-                            img = torch.unsqueeze(trace[0], -1)[0].cpu().detach().numpy()
-                    elif args.backend == 'hl':
+                    
+                    if args.backend == 'hl':
                         img = halide_fw(init_values)
                         if args.aa_nsamples > 0:
                             img = np.zeros(img.shape)
@@ -2293,7 +2156,20 @@ def main():
                                 img += halide_fw(init_values, render_kw={'uv_offset': np.random.rand(2) - 0.5})
                             img /= args.aa_nsamples
                     else:
-                        raise
+                        X_orig = set_par(normalized_init_values)
+                        trace = compiler_module.f(*params_orig[:-1], X_orig, trace, vec_output, camera_width, camera_height, camera_depth)
+                        if args.backend == 'tf':
+                            if args.is_color:
+                                img = tf.stack(trace[:3], -1)[0].numpy()
+                            else:
+                                img = tf.expand_dims(trace[0], -1)[0].numpy()
+                        elif args.backend == 'torch':
+                            if args.is_color:
+                                img = torch.stack(trace[:3], -1)[0].cpu().detach().numpy()
+                            else:
+                                img = torch.unsqueeze(trace[0], -1)[0].cpu().detach().numpy()
+                        else:
+                            raise
 
                     imsave(os.path.join(args.dir, 'init%s%05d.png' % (args.suffix, render_count)), img, args.backend == 'hl', ndims=args.ndims)
                     render_count += 1
@@ -2433,11 +2309,7 @@ def main():
                     if args.deriv_metric_line and args.line_endpoints_method == 'random_smooth':
                         
                         assert args.backend == 'hl'
-                        
-                        # this assertion makes sure we don't end up with changing normalized parameters too small
-                        # otherwise tf's precision problem can destroy the sampling
-                        #assert np.allclose(args_range, np.ones(args_range.shape))
-                        #max_half_len = 0.5
+
                         
                         # intentially set this small length to test whether sampling smoothed rhs workss
                         max_half_len = args.deriv_metric_max_halflen
@@ -2654,11 +2526,8 @@ def main():
                         deriv_img = halide_get_derivs(init_values)[0].transpose((2, 1, 0))
                         render_kw = {'finite_diff_h': finite_diff_h}
                         gt_deriv_img = np.stack(halide_FD(init_values, render_kw), 0)[..., 0].transpose((0, 2, 1))
-                    elif args.backend == 'tf':
-                        deriv_img = sess.run(param_gradients)
-                        gt_deriv_img = None
-                    elif args.backend == 'torch':
-                        deriv_img = np.concatenate(param_gradients, 0)
+                    elif args.backend in ['tf', 'torch']:
+                        deriv_img = param_gradients 
                         gt_deriv_img = None
                     else:
                         raise
@@ -2673,39 +2542,7 @@ def main():
 
             print('mean magnitude error:', np.mean(magnitude_errors))
             print('mean normalized error:', np.mean(normalized_errors))
-            
-            if args.benchmark:
-                # follow Halide's benchmark algorithm for fair comparison
-                
-                print('benchmarking gradient on %d samples and %d iterations per sample' % 
-                      (args.benchmark_samples, args.benchmark_iters))
-                
-                best = 1e8
-                
-                # Assumption: runtime for reduce_sum is neglegible, and it removes the need of copy a large tensor from GPU to CPU
-                #test_node = tf.reduce_sum(vec_output) + tf.reduce_sum(param_gradients)
-                
-                # Assumption: tf does not optimize for indexing, and this will still allow computation for everything in output and param_gradients, except they won't be copied back to CPU
-                if args.benchmark_fw_only:
-                    test_node = output[0, 0, 0]
-                else:
-                    test_node = [output[0, 0, 0], param_gradients[0, 0, 0, 0]]
-                
-                sess.run(test_node)
-                
-                for _ in range(args.benchmark_samples):
-                    T0 = time.time()
-                    for _ in range(args.benchmark_iters):
-                        #sess.run([vec_output, param_gradients])
-                        sess.run(test_node)
-                    T1 = time.time()
-                    
-                    best = min(best, T1 - T0)
-                    
-                val = best / args.benchmark_iters
-                
-                print('benchmark: %f ms per iter' % (val * 1000))
-                
+
             do_prune = None
             if args.backend == 'hl' and not args.ignore_glsl:
                 
@@ -2821,6 +2658,9 @@ def main():
 
         elif mode == 'optimization':
             
+            if args.backend == 'tf':
+                tf.compat.v1.disable_eager_execution()
+            
             global frame_idx
             
             base_loss = None
@@ -2842,42 +2682,17 @@ def main():
             
             par_len = compiler_module.nargs
             orig_par_len = par_len
+            
+            use_tf = args.backend == 'tf'
 
-            if args.backend == 'hl':
+            if args.backend != 'hl':
 
-                
-
-                if args.optimizer == 'adam' and args.use_tf_opt:
-                    use_tf = True
-                    
-                    assert opt_subset_idx is None
-
-                    import tensorflow
-                    tf = tensorflow
-                    dtype = tf.float32
-
-                    tunable_params = tf.Variable(np.zeros(par_len), dtype=dtype)
-                    deriv_pl = tf.placeholder(dtype, par_len)
-
-                    assign_init_pl = tf.placeholder(dtype, par_len)
-                    assign_op = tf.assign(tunable_params, assign_init_pl)
-
-                    set_par = set_par_functor(sess)
-
-                else:
-                    use_tf = False
-
-            else:
-                
                 assert opt_subset_idx is None
                 
-                use_tf = args.backend == 'tf'
+                
                 
                 vec_output = [None] * 3
                 trace = [None] * compiler_module.f_log_intermediate_len
-                
-                if use_tf:
-                    tf.reset_default_graph()
 
                 params_orig, set_par_functor, tunable_params = generate_tensor(gt_values, args_range=args_range, backend=args.backend, ndims=args.ndims)
 
@@ -2912,25 +2727,24 @@ def main():
 
                 if use_tf:
 
-                    if args.backend != 'hl':
-                        random_var_scale = tf.Variable(np.ones(len(random_var_indices)), dtype=tf.float32, trainable=False)
-                        random_var_scale_pl = tf.placeholder(tf.float32, len(random_var_indices))
-                        random_var_scale_assign = tf.assign(random_var_scale, random_var_scale_pl)
+                    random_var_scale = tf.Variable(np.ones(len(random_var_indices)), dtype=tf.float32, trainable=False)
+                    random_var_scale_pl = tf.compat.v1.placeholder(tf.float32, len(random_var_indices))
+                    random_var_scale_assign = tf.compat.v1.assign(random_var_scale, random_var_scale_pl)
 
-                        random_var_switch = tf.Variable(1.0, dtype=tf.float32, trainable=False)
-                        random_var_switch_pl = tf.placeholder(tf.float32, ())
-                        random_var_switch_assign = tf.assign(random_var_switch, random_var_switch_pl)
+                    random_var_switch = tf.Variable(1.0, dtype=tf.float32, trainable=False)
+                    random_var_switch_pl = tf.compat.v1.placeholder(tf.float32, ())
+                    random_var_switch_assign = tf.compat.v1.assign(random_var_switch, random_var_switch_pl)
 
-                        def func(sess, state):
-                            if isinstance(state, bool):
-                                if state:
-                                    sess.run(random_var_switch_assign, feed_dict={random_var_switch_pl: 1.0})
-                                else:
-                                    sess.run(random_var_switch_assign, feed_dict={random_var_switch_pl: 0.0})          
+                    def func(sess, state):
+                        if isinstance(state, bool):
+                            if state:
+                                sess.run(random_var_switch_assign, feed_dict={random_var_switch_pl: 1.0})
                             else:
-                                sess.run(random_var_scale_assign, feed_dict={random_var_scale_pl: state})
+                                sess.run(random_var_switch_assign, feed_dict={random_var_switch_pl: 0.0})          
+                        else:
+                            sess.run(random_var_scale_assign, feed_dict={random_var_scale_pl: state})
 
-                        set_random_var = func
+                    set_random_var = func
 
                     if args.tunable_param_random_var_opt:
                         if args.tunable_param_random_var_seperate_opt:
@@ -2938,8 +2752,8 @@ def main():
                         else:
                             random_var_scale_opt = tf.Variable(np.ones(1), dtype=tf.float32, trainable=True)
 
-                        random_var_scale_opt_pl = tf.placeholder(tf.float32, random_var_scale_opt.shape)
-                        random_var_scale_opt_assign = tf.assign(random_var_scale_opt, random_var_scale_opt_pl)
+                        random_var_scale_opt_pl = tf.compat.v1.placeholder(tf.float32, random_var_scale_opt.shape)
+                        random_var_scale_opt_assign = tf.compat.v1.assign(random_var_scale_opt, random_var_scale_opt_pl)
 
 
                         def func2(sess, val):
@@ -2997,13 +2811,6 @@ def main():
 
                     extra_kw = {'sigmas_idx': random_var_indices}
 
-                    if use_tf:
-                        combined_assign_op = tf.group((assign_op, random_var_scale_opt_assign))
-
-                        def set_par(par):
-                            sess.run(combined_assign_op, feed_dict={assign_init_pl: par[:orig_par_len],
-                                                                    random_var_scale_opt_pl: par[orig_par_len:]})
-
                 auto_fill_render_kw = auto_fill_render_kw_functor(extra_kw)
 
                 def halide_fw(params, render_kw={}):
@@ -3015,58 +2822,24 @@ def main():
                     return compiler_module.finite_diff(params, render_kw=render_kw)
             else:
 
-                if use_tf:
-                    random_noise_initializer = tf.no_op()
-                else:
-                    random_noise_initializer = None
-
                 if args.tunable_param_random_var:
 
                     if args.debug_mode:
 
                         extra_size = valid_start_idx - valid_end_idx
+                        
+                        noise_shape = [len(random_var_indices),
+                                       default_height + extra_size,
+                                       default_width + extra_size,
+                                       default_depth + extra_size]
 
-                        if args.halide_so_dir != '':
+                        noise_shape = noise_shape[:1 + args.ndims]
 
-                            Halide_lib.load_so(args.halide_so_dir)
+                        noise_val = np.random.normal(size=noise_shape).astype('f')
 
-                            par_len = init_values_pool.shape[1] - 1
-
-                            noise_buf = Halide_lib.so_lib.Buffer((default_width + extra_size, 
-                                                                  default_height + extra_size, 
-                                                                  par_len))
-                            noise_buf.set_min((-valid_start_idx, -valid_start_idx))
-                            noise_arr = np.asarray(noise_buf)
-
-                            noise_val = tf.placeholder(dtype, (len(random_var_indices),
-                                                               default_height + extra_size,
-                                                               default_width + extra_size))
-
-                            def get_noise(params):
-                                global frame_idx
-                                Halide_lib.so_lib.siggraph_lighting_noise_only(noise_buf, params, 
-                                                                       tile_offset[0], tile_offset[1],
-                                                                       default_width, default_height,
-                                                                       frame_idx);
-                                noise_buf.copy_to_host()
-
-                                ans = np.transpose(noise_arr[..., np.asarray(random_var_indices) - 3], (2, 1, 0))
-
-                                return ans
-                        else:
-                            
-                            noise_shape = [len(random_var_indices),
-                                           default_height + extra_size,
-                                           default_width + extra_size,
-                                           default_depth + extra_size]
-                            
-                            noise_shape = noise_shape[:1 + args.ndims]
-
-                            noise_val = np.random.normal(size=noise_shape).astype('f')
-
-                            #noise_val = np.load('/n/fs/scratch/yutingy/debug_noise.npy')
-                            #noise_val = np.transpose(noise_val, (2, 1, 0))
-                            #noise_val = noise_val[np.asarray(random_var_indices)]
+                        #noise_val = np.load('/n/fs/scratch/yutingy/debug_noise.npy')
+                        #noise_val = np.transpose(noise_val, (2, 1, 0))
+                        #noise_val = noise_val[np.asarray(random_var_indices)]
 
 
                     if args.backend == 'tf':
@@ -3077,7 +2850,7 @@ def main():
                             if args.debug_mode:
                                 current_random_val = tf.expand_dims(noise_val[i], 0)
                             else:
-                                current_random_val = tf.random.normal(X[idx].shape)
+                                current_random_val = tf.random.uniform(X[idx].shape) - 0.5
 
                             random_noise_lookup[idx] = random_var_switch * random_var_scale[i] * args.tunable_param_random_var_std * current_random_val * compiler_module.sigmas_range[idx]
 
@@ -3108,13 +2881,13 @@ def main():
 
 
                 if use_tf:
-                    config = tf.ConfigProto()  
+                    config = tf.compat.v1.ConfigProto()  
                     config.gpu_options.allow_growth=True  
-                    sess = tf.Session(config=config)  
+                    sess = tf.compat.v1.Session(config=config)  
 
                     #sess = tf.Session()
-                    sess.run(tf.local_variables_initializer())
-                    sess.run(tf.global_variables_initializer())
+                    sess.run(tf.compat.v1.local_variables_initializer())
+                    sess.run(tf.compat.v1.global_variables_initializer())
                     
 
                     with tf.name_scope('forward') as scope:
@@ -3201,10 +2974,7 @@ def main():
             if args.backend != 'hl':
                 set_random_var(sess, True)
 
-                if use_tf:
-                    set_par = set_par_functor(sess)
-                else:
-                    set_par = set_par_functor()
+                set_par = set_par_functor(sess)
 
                 loss_seq = []
                 loss_seq_names = []
@@ -3227,16 +2997,7 @@ def main():
                         
                         assert args.ndims == 2, 'TF only supports rendering 2D images'
                         
-                        with tf.name_scope('backward') as scope:
-                            # deriv wrt to NOT normalized parameters
-                            derivs = [tf.concat(compiler_module.g(*params_orig[:-1], X_orig, [1, 0, 0], trace, param_gradients, camera_width, camera_height, camera_depth), 0),
-                                      tf.concat(compiler_module.g(*params_orig[:-1], X_orig, [0, 1, 0], trace, param_gradients, camera_width, camera_height, camera_depth), 0),
-                                      tf.concat(compiler_module.g(*params_orig[:-1], X_orig, [0, 0, 1], trace, param_gradients, camera_width, camera_height, camera_depth), 0)]
-
-                        deriv_output_with_respect_to_param = tf.stack(derivs, -1)
-
-                        deriv_output_with_respect_to_param = deriv_output_with_respect_to_param[:, valid_start_idx:valid_end_idx, valid_start_idx:valid_end_idx, :]
-                        deriv_output_with_respect_to_param *= np.expand_dims(np.expand_dims(np.expand_dims(args_range, -1), -1), -1)        
+                        
                        
                         tiled_deriv_with_pad = None
 
@@ -3304,27 +3065,7 @@ def main():
                 if args.optimizer.startswith('scipy'):
                     scipy_optimizer = args.optimizer.split('.')[-1]
                 elif args.optimizer == 'adam':
-
-                    if use_tf:
-
-                        opt = tf.train.AdamOptimizer(learning_rate=args.learning_rate, beta1=args.opt_beta1, beta2=args.opt_beta2)
-
-                        if random_var_scale_opt_pl is not None:
-                            deriv_pl = tf.placeholder(dtype, orig_par_len + random_var_opt_len)
-                            gvs = [(deriv_pl[:orig_par_len], tunable_params),
-                                   (deriv_pl[orig_par_len:], random_var_scale_opt)]
-                        else:
-                            gvs = [(deriv_pl, tunable_params)]
-
-                        step = opt.apply_gradients(gvs)
-
-                        config = tf.ConfigProto()  
-                        config.gpu_options.allow_growth=True  
-                        sess = tf.Session(config=config)
-                        sess.run(tf.local_variables_initializer())
-                        sess.run(tf.global_variables_initializer())   
-                    else:
-                        opt = AdamOptim(eta=args.learning_rate, opt_subset_idx=opt_subset_idx, beta1=args.opt_beta1, beta2=args.opt_beta2)
+                    opt = AdamOptim(eta=args.learning_rate, opt_subset_idx=opt_subset_idx, beta1=args.opt_beta1, beta2=args.opt_beta2)
 
                 if args.optimizer == 'mcmc':
                     compiler_module.normalized_par = False
@@ -3343,12 +3084,6 @@ def main():
                 if base_loss is None:
                     base_loss = tf.reduce_mean((x - y) ** 2)
 
-                all_ops = tf.get_default_graph().get_operations()
-                forward_ops = [op for op in all_ops if op.name.startswith('forward')]
-                backward_ops = [op for op in all_ops if op.name.startswith('backward')]
-
-                print('forward ops:', len(forward_ops))
-                print('backward ops:', len(backward_ops))
 
                 if (len(metric_funcs) > 1 or args.multi_scale_optimization) and len(loss_seq) > 0:
                     pass
@@ -3366,9 +3101,9 @@ def main():
                 opt = None
 
                 if args.optimizer == 'adam':
-                    opt = tf.train.AdamOptimizer(learning_rate=args.learning_rate, beta1=args.opt_beta1, beta2=args.opt_beta2)
+                    opt = tf.compat.v1.train.AdamOptimizer(learning_rate=args.learning_rate, beta1=args.opt_beta1, beta2=args.opt_beta2)
                 elif args.optimizer == 'gradient_descent':
-                    opt = tf.train.GradientDescentOptimizer(learning_rate=args.learning_rate)
+                    opt = tf.compat.v1.train.GradientDescentOptimizer(learning_rate=args.learning_rate)
                 elif args.optimizer.startswith('scipy'):
                     scipy_optimizer = args.optimizer.split('.')[-1]
                 elif args.optimizer == 'mcmc':
@@ -3404,13 +3139,7 @@ def main():
 
                     if opt is not None:
 
-                        if gradient_method == 'finite_diff':
-
-
-                            deriv_loss_with_respect_to_param = tf.placeholder(tf.float32, int(tunable_params.shape[0]))
-                            finite_diff_pls.append(deriv_loss_with_respect_to_param)
-
-                        elif gradient_method in ['ours', 'finite_diff_pixelwise']:
+                        if gradient_method == 'ours':
 
                             deriv_loss_with_respect_to_param = 0
                             gradient_map = 0
@@ -3427,7 +3156,22 @@ def main():
                             if follow_last:
                                 loss_pixelwise_gradient = loss_pixelwise_gradient + old_loss_pixelwise_gradient
 
-                            gradient_map = gradient_map + loss_pixelwise_gradient * deriv_output_with_respect_to_param
+                            loss_pixelwise_gradient_padded = tf.pad(loss_pixelwise_gradient, 
+                                                                    [[0, 0], [1, 1], [1, 1], [0, 0]], "CONSTANT")
+                                
+                            deriv_output_with_respect_to_param = compiler_module.g(*params_orig[:-1], X_orig, 
+                                                                                   [loss_pixelwise_gradient_padded[..., 0],
+                                                                                    loss_pixelwise_gradient_padded[..., 1],
+                                                                                    loss_pixelwise_gradient_padded[..., 2]], 
+                                                             trace, param_gradients, camera_width, camera_height, camera_depth)
+                                
+                            deriv_output_with_respect_to_param = tf.expand_dims(tf.concat(deriv_output_with_respect_to_param, 0), -1)
+                            
+                            deriv_output_with_respect_to_param = deriv_output_with_respect_to_param[:, valid_start_idx:valid_end_idx, valid_start_idx:valid_end_idx, :]
+                            deriv_output_with_respect_to_param *= np.expand_dims(np.expand_dims(np.expand_dims(args_range, -1), -1), -1)        
+                            
+                            
+                            gradient_map = gradient_map + deriv_output_with_respect_to_param
                             
                             last_ndims = tuple(np.arange(1, int(len(gradient_map.shape))).astype(int))
                             deriv_loss_with_respect_to_param = tf.reduce_sum(gradient_map, last_ndims)
@@ -3497,8 +3241,8 @@ def main():
 
                 nsteps = len(steps)
 
-                sess.run(tf.local_variables_initializer())
-                sess.run(tf.global_variables_initializer())
+                sess.run(tf.compat.v1.local_variables_initializer())
+                sess.run(tf.compat.v1.global_variables_initializer())
 
             elif args.backend == 'torch':
                 base_loss = lambda x, y: torch.mean((x - y) ** 2)
@@ -3579,10 +3323,6 @@ def main():
 
                     init_values = np.concatenate((init_values, [1] * dummy_last_dim))
 
-                    if args.backend == 'tf':
-                        estimatd_std_orig_img = tf.placeholder(tf.float32, output_orig.shape)
-                        estimate_std_loss = tf.reduce_mean((output_orig - estimatd_std_orig_img) ** 2)
-
                 global_min_loss_val = 1e8
                 global_min_loss_par = init_values
                 global_last_loss_par = init_values
@@ -3620,8 +3360,8 @@ def main():
                         current_var_scale = np.ones(dummy_last_dim)
 
                     if use_tf:
-                        sess.run(tf.local_variables_initializer())
-                        sess.run(tf.global_variables_initializer())
+                        sess.run(tf.compat.v1.local_variables_initializer())
+                        sess.run(tf.compat.v1.global_variables_initializer())
                     elif args.backend == 'torch':
                         if random_var_scale_opt is None:
                             opt = torch.optim.Adam(tunable_params, lr=args.learning_rate, betas=(args.opt_beta1, args.opt_beta2))
@@ -3710,10 +3450,6 @@ def main():
 
                             need_new_deriv = False
 
-                            
-
-                            if use_tf:
-                                set_par(min_loss_par)
                         elif args.backend == 'torch':
                             
                             if ns_wide == 0:
@@ -3747,13 +3483,6 @@ def main():
                             step = steps[ns]
                             true_loss = loss_to_opt[ns]
                             gvs = gvs_seq[ns]
-
-
-                            if len(finite_diff_pls) > 0:
-                                # deriv_loss_with_respect_to_param is a placeholder only when using finite_diff
-                                # in all other cases there's no need to get the tensor of deriv_loss_with_respect_to_param
-                                # because gvs contains all necessary information
-                                deriv_loss_with_respect_to_param = finite_diff_pls[ns]
 
                             set_par(min_loss_par, dummy_last_dim)
                             
@@ -4103,23 +3832,8 @@ def main():
                                     if need_new_deriv:
                                         next_deriv, _, _ = metric.run_wrapper(par_val, stage=ns, get_loss=True, get_dL=False, check_last=False, get_deriv=True, render_kw=render_kw)
 
-                                    if any(np.isnan(next_deriv)):
-                                        print('here')
-                                    
-                                    
-                                    
-                                    if use_tf:
-                                        if gradient_method == 'ours':
-                                            feed_dict = {deriv_pl: next_deriv}
-                                        else:
-                                            # ALREADY normalized
-                                            feed_dict = {deriv_pl: next_deriv}
 
-                                        sess.run(step, feed_dict=feed_dict)
-
-                                        par_val = sess.run(all_params)
-                                    else:
-                                        par_val = opt.update(par_val, next_deriv)
+                                    par_val = opt.update(par_val, next_deriv)
 
                                     #par_val_orig = par_val * args_range
                                     par_val_orig = par_val

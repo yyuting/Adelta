@@ -24,4 +24,6 @@ def run(shader_file, path=None):
             
         print(line)
         os.system(line)
-       
+
+if __name__ == '__main__':
+    run(*sys.argv[1:])
