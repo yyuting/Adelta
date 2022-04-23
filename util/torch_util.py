@@ -83,7 +83,7 @@ def get_partial_trace_coord(*args):
     
     ans = node.float() - get_neighbor(node, pix_idx).float()
     
-    if pix_idx in [1, 3]:
+    if pix_idx in [1, 3, 5]:
         ans = -ans
     
     return ans

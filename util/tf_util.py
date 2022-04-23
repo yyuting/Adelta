@@ -210,22 +210,21 @@ def get_neighbor(*args):
         node = buffer[read_idx]
     else:
         raise 'Unknown signature to get_neighbor'
-        
-    if is_batch:
-        base_idx = 1
-    else:
-        base_idx = 0
-        
+
     if pix_idx == 0:
         return node
     elif pix_idx == 1:
-        return tf.roll(node, -1, axis=2+base_idx)
+        return tf.roll(node, -1, axis=-1)
     elif pix_idx == 2:
-        return tf.roll(node, 1, axis=2+base_idx)
+        return tf.roll(node, 1, axis=-1)
     elif pix_idx == 3:
-        return tf.roll(node, -1, axis=1+base_idx)
+        return tf.roll(node, -1, axis=-2)
     elif pix_idx == 4:
-        return tf.roll(node, 1, axis=1+base_idx)
+        return tf.roll(node, 1, axis=-2)
+    elif pix_idx == 5:
+        return tf.roll(node, -1, axis=-3)
+    elif pix_idx == 6:
+        return tf.roll(node, 1, axis=-3)
     else:
         raise
         
@@ -250,7 +249,7 @@ def get_partial_trace_coord(*args):
     
     ans = tf.cast(node, tf.float32) - tf.cast(get_neighbor(node, pix_idx, is_batch), tf.float32)
     
-    if pix_idx in [1, 3]:
+    if pix_idx in [1, 3, 5]:
         ans = -ans
     
     return ans

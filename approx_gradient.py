@@ -320,11 +320,13 @@ def nscale_metric_functor(nscale, base_metric, smoothing_sigmas=None, axis=None,
             downsample_scale = [2, 1]
             
         if ndims == 3:
+            assert nsamples == 1
             if backend == 'torch':
                 x = torch.permute(x, (4, 0, 1, 2, 3))
                 y = torch.permute(y, (4, 0, 1, 2, 3))
-                assert nsamples == 1
                 avg_pool = torch.nn.AvgPool3d(downsample_scale, 2)
+            else:
+                avg_pool = tf.nn.avg_pool3d
         else:
             if backend == 'torch':
                 # use C x 1 x w x h
@@ -334,6 +336,8 @@ def nscale_metric_functor(nscale, base_metric, smoothing_sigmas=None, axis=None,
                 y = torch.permute(y, (3, 0, 1, 2))
                 assert nsamples == 1
                 avg_pool = torch.nn.AvgPool2d(downsample_scale, 2)
+            else:
+                avg_pool = tf.nn.avg_pool
         
         
             
@@ -349,8 +353,8 @@ def nscale_metric_functor(nscale, base_metric, smoothing_sigmas=None, axis=None,
             
             if i > 0:
                 if backend == 'tf':
-                    x = tf.nn.avg_pool(x, downsample_scale, 2, 'VALID')
-                    y = tf.nn.avg_pool(y, downsample_scale, 2, 'VALID')
+                    x = avg_pool(x, downsample_scale, 2, 'VALID')
+                    y = avg_pool(y, downsample_scale, 2, 'VALID')
                 elif backend == 'torch':
                     x = avg_pool(x)
                     y = avg_pool(y)
@@ -368,23 +372,22 @@ def nscale_metric_functor(nscale, base_metric, smoothing_sigmas=None, axis=None,
             current_scale -= 1
 
             if i == nscale - 1 and smoothing_sigmas is not None:
+                
+                assert ndims == 2
 
                 if backend == 'tf':
                     nh = int(x.shape[1])
                     nw = int(x.shape[2])
 
-                    if ndims == 2:
-                        # combine n and c dimension so that the identical convolution takes on every channel
-                        transposed_x = tf.expand_dims(tf.reshape(tf.transpose(x, (0, 3, 1, 2)), (nsamples * nchannels, nh, nw)), -1)
-                        transposed_y = tf.expand_dims(tf.reshape(tf.transpose(y, (0, 3, 1, 2)), (nsamples * nchannels, nh, nw)), -1)
+                    # combine n and c dimension so that the identical convolution takes on every channel
+                    transposed_x = tf.expand_dims(tf.reshape(tf.transpose(x, (0, 3, 1, 2)), (nsamples * nchannels, nh, nw)), -1)
+                    transposed_y = tf.expand_dims(tf.reshape(tf.transpose(y, (0, 3, 1, 2)), (nsamples * nchannels, nh, nw)), -1)
                 else:
                     transposed_x = x
                     transposed_y = y
 
                 for current_sigma in smoothing_sigmas:
                     
-                    assert ndims <= 2
-
                     assert current_sigma > 0
 
                     # use a larger cutoff ratio to save computation, can go back to the normal 3sigma cutoff if needed
@@ -1501,9 +1504,11 @@ def main():
                     param_gradients = compiler_module.g(*params_orig[:-1], X_orig, dL_dcol, trace, [], camera_width, camera_height, camera_depth)
 
 
-                    if args.backend == 'tf':                            
-                        param_gradients = tf.concat(param_gradients, 0).numpy()
-                        param_gradients *= np.expand_dims(np.expand_dims(args_range, -1), -1) 
+                    if args.backend == 'tf': 
+                        param_gradients = np.concatenate([param_gradients[i].numpy() * args_range[i] for i in range(len(param_gradients))], 0)
+                        
+                        #param_gradients = tf.concat(param_gradients, 0).numpy()
+                        #param_gradients *= np.expand_dims(np.expand_dims(args_range, -1), -1) 
                     else:
                         param_gradients = np.concatenate([param_gradients[i].cpu().detach().numpy() * args_range[i] for i in range(len(param_gradients))], 0)
 
@@ -2994,9 +2999,7 @@ def main():
                     param_gradients = np.zeros(nargs).tolist()
 
                     if use_tf:
-                        
-                        assert args.ndims == 2, 'TF only supports rendering 2D images'
-                        
+                                                
                         
                        
                         tiled_deriv_with_pad = None
@@ -3157,18 +3160,18 @@ def main():
                                 loss_pixelwise_gradient = loss_pixelwise_gradient + old_loss_pixelwise_gradient
 
                             loss_pixelwise_gradient_padded = tf.pad(loss_pixelwise_gradient, 
-                                                                    [[0, 0], [1, 1], [1, 1], [0, 0]], "CONSTANT")
+                                                                    [[0, 0]] + [[1, 1]] * args.ndims + [[0, 0]], "CONSTANT")
                                 
                             deriv_output_with_respect_to_param = compiler_module.g(*params_orig[:-1], X_orig, 
-                                                                                   [loss_pixelwise_gradient_padded[..., 0],
-                                                                                    loss_pixelwise_gradient_padded[..., 1],
-                                                                                    loss_pixelwise_gradient_padded[..., 2]], 
+                                                                                   [loss_pixelwise_gradient_padded[..., i] for i in range(int(loss_pixelwise_gradient_padded.shape[-1]))], 
                                                              trace, param_gradients, camera_width, camera_height, camera_depth)
                                 
+                            deriv_output_with_respect_to_param = [deriv_output_with_respect_to_param[i] * args_range[i] for i in range(len(deriv_output_with_respect_to_param))]
+                            
                             deriv_output_with_respect_to_param = tf.expand_dims(tf.concat(deriv_output_with_respect_to_param, 0), -1)
                             
-                            deriv_output_with_respect_to_param = deriv_output_with_respect_to_param[:, valid_start_idx:valid_end_idx, valid_start_idx:valid_end_idx, :]
-                            deriv_output_with_respect_to_param *= np.expand_dims(np.expand_dims(np.expand_dims(args_range, -1), -1), -1)        
+                            deriv_output_with_respect_to_param = deriv_output_with_respect_to_param[current_slice]
+                            #deriv_output_with_respect_to_param *= np.expand_dims(np.expand_dims(np.expand_dims(args_range, -1), -1), -1)        
                             
                             
                             gradient_map = gradient_map + deriv_output_with_respect_to_param
@@ -3246,9 +3249,14 @@ def main():
 
             elif args.backend == 'torch':
                 base_loss = lambda x, y: torch.mean((x - y) ** 2)
-                nsteps = nscale
+                possible_nsteps = nscale
                 if smoothing_sigmas is not None:
-                    nsteps += len(smoothing_sigmas)
+                    possible_nsteps += len(smoothing_sigmas)
+                    
+                if args.multi_scale_optimization:
+                    nsteps = possible_nsteps
+                else:
+                    nsteps = 1
                 
             if use_tf:
                 if random_var_opt_len >= 1:
@@ -3499,29 +3507,11 @@ def main():
 
                             if args.debug_mode and args.halide_so_dir != '':
                                 feed_dict[noise_val] = get_noise(init_values[1:-dummy_last_dim])
-
+                                
                             if ns_wide == 0:
-
-                                #set_random_var(sess, False)
-
-                                #feed_dict = {assign_init_pl: init_values}
-                                #sess.run(assign_ops, feed_dict=feed_dict)
                                 set_par(init_values, dummy_last_dim)
-
-                                
-
                                 init_img = sess.run(output_valid, feed_dict=feed_dict)[0]
-                                
-                                if args.ndims == 1:
-                                    plt.plot(init_img)
-                                    plt.savefig(os.path.join(args.dir, 'init%d.png' % i))
-                                    plt.close()
-                                elif args.ndims == 2:
-                                    imsave(os.path.join(args.dir, 'init%d.png' % i), np.clip(init_img, 0, 1), args.backend == 'hl', ndims=args.ndims)
-                                else:
-                                    raise
-
-
+                                imsave(os.path.join(args.dir, 'init%d.png' % i), init_img, ndims=args.ndims)  
                             else:
                                 last_loss_par = np.array(min_loss_par)
 
@@ -3861,7 +3851,11 @@ def main():
                                     if apply_random is not None:
                                         X_orig = apply_random(X_orig)
                                     x = shader(*params_orig[:-1], *X_orig, camera_width, camera_height, camera_depth)[current_slice]
-                                    loss = metric_funcs[0](x, y, {'scale': ns})
+                                    if args.multi_scale_optimization:
+                                        current_step = ns
+                                    else:
+                                        current_step = possible_nsteps
+                                    loss = metric_funcs[0](x, y, {'scale': current_step})
                                     
                                     loss.backward()
                                     opt.step()

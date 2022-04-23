@@ -21,13 +21,13 @@ args_range = np.array([300, 200, 1])
 sigmas_range = args_range
 
 def cmd_check(backend):
-    if backend in ['hl', 'tf']:
+    if backend in ['hl']:
         print('Error! this shader cannot be compiled into %s backend' % backend)
         raise
 
 def cmd_template():
     
-    cmd = f"""python approx_gradient.py --shader test_finite_diff_1D_pulse --init_values_pool apps/example_init_values/test_finite_diff_1D_pulse_init_values.npy --metrics 5_scale_L2 --render_size 600 --ndims 1 --ignore_glsl"""
+    cmd = f"""python approx_gradient.py --shader test_finite_diff_1D_pulse --init_values_pool apps/example_init_values/test_finite_diff_1D_pulse_init_values.npy --metrics 5_scale_L2 --render_size 600 --ndims 1 --ignore_glsl --multi_scale_optimization"""
         
     return cmd
 
