@@ -1,5 +1,7 @@
 # Adelta
 
+Adelta is a domain specific language for automatically differentiate programs with discontinuities. It is a research artifact for the SIGGRAPH 2022 paper "Aδ: Autodiff for Discontinuous Programs – Applied to Shaders" ([project page](https://pixl.cs.princeton.edu/pubs/Yang_2022_AAF/)).
+
 ## Package dependencies
 
 The source code is developed and tested under python 3.6, Halide 10.0, TensorFlow 2.6.2 and Pytorch 1.10.2. A full list of python environment can be found in environment.yml.
@@ -17,13 +19,17 @@ In the Adelta directory, run
 Figures and tables will be generated at optimization_path/restul.
 
 ## Using our compiler
+    
+### A note on backends
 
-### Halide backend
+We provide three different backend for generating the gradient program (Halide, TensorFlow, Pytorch). \
 
-Our default and most efficient backend is Halide. To use it, install Halide from [here](https://github.com/halide/Halide), then use the following command generate pre-compiled kernels.
+Our default and most efficient backend is Halide. It also supports comparison with baselines finite difference and SPSA. To use it, install Halide from [here](https://github.com/halide/Halide), then use the following command generate pre-compiled kernels.
 
     mkdir hl_tmp
     python script_compile_halide.py <halide_install_path> hl_tmp
+
+Both TensorFlow and Pytorch backends are used for our gradient only. We additionally include the 1D and 3D examples for these two backends. Note the TensorFlow backend allows eager execution under "visualize_gradient" mode, but resorts to the legacy 1.x style compute graph implementation under "optimization" mode.
 
 ### Reproducing experiments in the paper
 
@@ -78,10 +84,3 @@ cd apps
 python run_shader.py render_test_finite_diff_1D_pulse.py <dir_1D_pulse> --backend torch --mode optimization
 python run_shader.py render_test_finite_diff_3D_sphere.py <dir_3D_sphere> --backend torch --mode optimization
 ```
-### A note on backends
-
-We provide three different backend for generating the gradient program (Halide, TensorFlow, Pytorch). 
-
-Halide is used for all the experiments reported in our paper. It also supports comparison with baselines finite difference and SPSA.
-
-Both TensorFlow and Pytorch backends are used for our gradient only. We additionally include the 1D and 3D examples for these two backends. Note the TensorFlow backend allows eager execution under "visualize_gradient" mode, but resorts to the legacy 1.x style compute graph implementation under "optimization" mode.
