@@ -84,3 +84,21 @@ cd apps
 python run_shader.py render_test_finite_diff_1D_pulse.py <dir_1D_pulse> --backend torch --mode optimization
 python run_shader.py render_test_finite_diff_3D_sphere.py <dir_3D_sphere> --backend torch --mode optimization
 ```
+
+## License
+
+The research materials presented in this repository are licensed for non-commercial use under Adobe Research License Terms For Redistributable Adobe Materials. Please see the [license](https://github.com/yyuting/Adelta/blob/main/LICENSE) for the full legal text.
+
+## Citation and Bibtex
+
+Yuting Yang, Connelly Barnes, Andrew Adams, and Adam Finkelstein.
+"A𝛿: Autodiff for Discontinuous Programs – Applied to Shaders."
+ACM SIGGRAPH, to appear, August 2022.
+
+@inproceedings{Yang:2022:AAF,
+   author = "Yuting Yang and Connelly Barnes and Andrew Adams and Adam Finkelstein",
+   title = "A$\delta$: Autodiff for Discontinuous Programs – Applied to Shaders",
+   booktitle = "ACM SIGGRAPH, to appear",
+   year = "2022",
+   month = aug
+}
