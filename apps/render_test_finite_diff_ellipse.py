@@ -17,8 +17,8 @@ def cmd_template():
     
     return cmd
 
-nargs = 8
-args_range = np.array([256., 256., 256., 1., 1., 1., 1., 1])
+nargs = 9
+args_range = np.array([256., 256., 256., 1., 1., 1., 1., 1, 1])
 
 def test_finite_diff_ellipse(u, v, X, width=960, height=640):
     
@@ -30,16 +30,17 @@ def test_finite_diff_ellipse(u, v, X, width=960, height=640):
     alpha = X[6]
     fill_col = fill_col * alpha
     
-    alpha = X[7]
+    ratio = X[7]
+    theta = X[8]
     
     bg_col = np.array([0., 0., 0.])
     
     u_diff = Var('u_diff', u - origin_x)
     v_diff = Var('v_diff', v - origin_y)
     
-    x_diff = u_diff * np.sin(np.pi / 4) + v_diff * np.cos(np.pi / 4)
-    y_diff = u_diff * np.cos(np.pi / 4) - v_diff * np.sin(np.pi / 4)
-    y_diff = y_diff * alpha
+    x_diff = u_diff * sin(theta) + v_diff * cos(theta)
+    y_diff = u_diff * cos(theta) - v_diff * sin(theta)
+    y_diff = y_diff * ratio
     
     dist2 = (x_diff) ** 2 + (y_diff) ** 2
     
