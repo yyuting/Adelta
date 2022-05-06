@@ -96,9 +96,12 @@ def render_single(base_dir, shader_name, args, outdir=None, render_size=None):
     if hasattr(m, 'sigmas_range'):
         kw['sigmas_range'] = m.sigmas_range
         
-    
+    if hasattr(m, 'is_color'):
+        is_color = m.is_color
+    else:
+        is_color = True
         
-    ans = multiple_shaders()(shaders, base_dir=base_dir, is_color=m.is_color, **kw)
+    ans = multiple_shaders()(shaders, base_dir=base_dir, is_color=is_color, **kw)
     T1 = time.time()
     
     return ans

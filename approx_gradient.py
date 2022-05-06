@@ -830,6 +830,7 @@ def main():
     parser.add_argument('--backend', dest='backend', default='hl', help='specifies the backend to use, can be hl, tf or jnp')
     parser.add_argument('--halide_so_dir', dest='halide_so_dir', default='', help='specifies the location to the so file for Halide binding')
     parser.add_argument('--init_values_pool', dest='init_values_pool', default='', help='file that saves multiple initial values')
+    parser.add_argument('--init_values', dest='init_values', default='', help='specifies initial values, seperated by comma')
     parser.add_argument('--debug_mode', dest='debug_mode', action='store_true', help='using debug features')
     parser.add_argument('--modes', dest='modes', default='all', help='choose the modes to run')
     parser.add_argument('--metrics', dest='metrics', default='all', help='choose the metrics')
@@ -1179,7 +1180,11 @@ def main():
 
     finite_diff_h = args.finite_diff_h
     
-    init_values_pool = np.load(args.init_values_pool)
+    if args.init_values_pool != '':
+        init_values_pool = np.load(args.init_values_pool)
+    else:
+        assert args.init_values != ''
+        init_values_pool = np.array([float(val) for val in args.init_values.split(',')])
     
     if args.target_par_file != '':
         target_par = np.load(args.target_par_file)[0]
