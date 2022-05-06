@@ -59,11 +59,7 @@ nargs = 7
 args_range = np.array([256., 256., 256., 1., 1., 1., 1.])
 
 def test_finite_diff_circle(u, v, X, width=960, height=640):
-    """
-    X has shape nargs + 3
-    first 3 entries are u, v, time
-    the other entries are scalar tunable parameters
-    """
+
     radius = X[0]
     origin_x = X[1]
     origin_y = X[2]
