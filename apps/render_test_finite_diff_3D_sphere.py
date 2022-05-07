@@ -1,11 +1,11 @@
 """
 ------------------------------------------------------------------------------------------------------------------------------
 # command for visualization
-python approx_gradient.py --dir /n/fs/scratch/yutingy/test_finite_diff_3D_sphere --shader test_finite_diff_3D_sphere --init_values_pool apps/example_init_values/test_finite_diff_3D_sphere_init_values.npy --modes visualize_gradient --metrics naive_sum --gradient_methods_optimization ours --learning_rate 0.01 --finite_diff_h 0.01 --finite_diff_both_sides --render_size 50,50,50 --backend torch --ndims 3 --ignore_glsl
+python approx_gradient.py --dir /n/fs/scratch/yutingy/test_finite_diff_3D_sphere --shader test_finite_diff_3D_sphere --init_values_pool apps/example_init_values/test_finite_diff_3D_sphere_init_values.npy --modes visualize_gradient --metrics naive_sum --gradient_methods_optimization ours --learning_rate 0.01 --finite_diff_h 0.01 --finite_diff_both_sides --render_size 50,50,50 --backend torch --ndims 3 --ignore_glsl --no_col
 
-python approx_gradient.py --dir /n/fs/scratch/yutingy/test_finite_diff_3D_sphere --shader test_finite_diff_3D_sphere --init_values_pool apps/example_init_values/test_finite_diff_3D_sphere_init_values.npy --modes optimization --metrics 5_scale_L2 --gradient_methods_optimization ours --learning_rate 0.01 --finite_diff_h 0.01 --finite_diff_both_sides --render_size 50,50,50 --backend torch --ndims 3 --ignore_glsl
+python approx_gradient.py --dir /n/fs/scratch/yutingy/test_finite_diff_3D_sphere --shader test_finite_diff_3D_sphere --init_values_pool apps/example_init_values/test_finite_diff_3D_sphere_init_values.npy --modes optimization --metrics 5_scale_L2 --gradient_methods_optimization ours --learning_rate 0.01 --finite_diff_h 0.01 --finite_diff_both_sides --render_size 50,50,50 --backend torch --ndims 3 --ignore_glsl --no_col
 
-python approx_gradient.py --dir /n/fs/scratch/yutingy/test_finite_diff_3D_sphere --shader test_finite_diff_3D_sphere --init_values_pool apps/example_init_values/test_finite_diff_3D_sphere_init_values.npy --modes optimization --metrics 5_scale_L2 --gradient_methods_optimization ours --learning_rate 0.01 --finite_diff_h 0.01 --finite_diff_both_sides --render_size 50,50,50 --backend torch --ndims 3 --ignore_glsl --tunable_param_random_var --tunable_param_random_var_opt --tunable_param_random_var_seperate_opt --tunable_param_random_var_opt_scheduling all --tunable_param_random_var_std 1 --no_reset_opt --no_binary_search_std --no_reset_sigma
+python approx_gradient.py --dir /n/fs/scratch/yutingy/test_finite_diff_3D_sphere --shader test_finite_diff_3D_sphere --init_values_pool apps/example_init_values/test_finite_diff_3D_sphere_init_values.npy --modes optimization --metrics 5_scale_L2 --gradient_methods_optimization ours --learning_rate 0.01 --finite_diff_h 0.01 --finite_diff_both_sides --render_size 50,50,50 --backend torch --ndims 3 --ignore_glsl --tunable_param_random_var --tunable_param_random_var_opt --tunable_param_random_var_seperate_opt --tunable_param_random_var_opt_scheduling all --tunable_param_random_var_std 1 --no_reset_opt --no_binary_search_std --no_reset_sigma --no_col
 """
 
 from render_util import *
@@ -21,7 +21,7 @@ def cmd_check(backend):
 
 def cmd_template():
         
-    cmd = f"""python approx_gradient.py --shader test_finite_diff_3D_sphere --init_values_pool apps/example_init_values/test_finite_diff_3D_sphere_init_values.npy --metrics 5_scale_L2 --render_size 50,50,50 --ndims 3 --ignore_glsl --multi_scale_optimization"""
+    cmd = f"""python approx_gradient.py --shader test_finite_diff_3D_sphere --init_values_pool apps/example_init_values/test_finite_diff_3D_sphere_init_values.npy --metrics 5_scale_L2 --render_size 50,50,50 --ndims 3 --ignore_glsl --multi_scale_optimization --no_col"""
     
     return cmd
 

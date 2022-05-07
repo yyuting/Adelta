@@ -24,6 +24,7 @@ import numpy.linalg
 import skimage
 import skimage.io
 import skimage.feature
+from inspect import signature
 
 from tempfile import NamedTemporaryFile
 
@@ -235,8 +236,13 @@ def render_shader(objective_functor, is_color=default_is_color, base_dir='out', 
     if ndims > 2:
         w = ArgumentScalar(DEFAULT_ARGUMENT_SCALAR_W_NAME)
         tup += (w,)
-    
-    f = objective_functor(*tup, X, scalar_loss_scale)
+        
+    sig = signature(objective_functor)
+    if len(sig.parameters) > len(tup) + 1:    
+        f = objective_functor(*tup, X, scalar_loss_scale)
+    else:
+        f = objective_functor(*tup, X)
+        
     if isinstance(f, (list, tuple)):
         scalar_loss = f[1]
         f = f[0]

@@ -42,7 +42,7 @@ camea_height = default_height
 camera_depth = default_depth
 
 all_modes = ['visualize_gradient', 'render', 'optimization', 'search_init']
-all_metrics = ['L2']
+all_metrics = ['1_scale_L2']
 all_gradient_methods = ['ours', 'finite_diff', 'finite_diff_pixelwise', 'AD']
 
 invalid_op_types = ['Const', 'Cast', 'ExpandDims', 'Roll', 'StridedSlice']
@@ -833,8 +833,8 @@ def main():
     parser.add_argument('--init_values', dest='init_values', default='', help='specifies initial values, seperated by comma')
     parser.add_argument('--debug_mode', dest='debug_mode', action='store_true', help='using debug features')
     parser.add_argument('--modes', dest='modes', default='all', help='choose the modes to run')
-    parser.add_argument('--metrics', dest='metrics', default='all', help='choose the metrics')
-    parser.add_argument('--gradient_methods_optimization', dest='gradient_methods_optimization', default='all', help='choose gradient methods used for optimization')
+    parser.add_argument('--metrics', dest='metrics', default='1_scale_L2', help='choose the metrics')
+    parser.add_argument('--gradient_methods_optimization', dest='gradient_methods_optimization', default='ours', help='choose gradient methods used for optimization')
     parser.add_argument('--learning_rate', dest='learning_rate', type=float, default=learning_rate, help='learning rate for optimization')
     parser.add_argument('--finite_diff_h', dest='finite_diff_h', type=float, default=finite_diff_h, help='h used for finite diff')
     parser.add_argument('--finite_diff_both_sides', dest='finite_diff_both_sides', action='store_true', help='if specified, use both side for finite diff (x + h and x - h)')
@@ -862,7 +862,8 @@ def main():
     parser.add_argument('--verbose_save', dest='verbose_save', action='store_true', help='if specified, save every possible for each iteration')
     parser.add_argument('--save_best_par', dest='save_best_par', action='store_true', help='if specified, save tunable parameter for the best optimization')
     parser.add_argument('--loss_filename', dest='loss_filename', default='', help='specifies a unique filename for saved loss')
-    parser.add_argument('--is_color', dest='is_color', action='store_true', help='specifies whether the rendering is color or greyscale')
+    parser.add_argument('--is_color', dest='is_color', action='store_true', help='specifies the rendering is color with 3 channel')
+    parser.add_argument('--no_col', dest='is_color', action='store_false', help='specifies the rendering is single channel')
     parser.add_argument('--visualize_same_scale', dest='visualize_same_scale', action='store_true', help='if specified, in visualization use same scale to color ours and gt, otherwise use their indivisual scale')
     parser.add_argument('--finite_diff_random_dir', dest='finite_diff_random_dir', action='store_true', help='if specified, only apply finite diff to one random direction, NOT to all parameter directions')
     parser.add_argument('--finite_diff_spsa_samples', dest='finite_diff_spsa_samples', type=int, default=-1, help='if positive, will use the SPSA algorithm to compute stochastic finite diff, and the value is the number of samples drawn per iter')
@@ -946,6 +947,8 @@ def main():
     parser.add_argument('--aa_nsamples', dest='aa_nsamples', type=int, default=0, help='if specified, render antialiased image')
     parser.add_argument('--shader_args', dest='shader_args', default='', help='specifies arguments that can be set for shader programs, should be the form of name0:val0#name1:val1... values will be evaluated using eval()')
     parser.add_argument('--ndims', dest='ndims', type=int, default=2, help='specifies the dimensionality of the rendering')
+    
+    parser.set_defaults(is_color=True)
     
     args = parser.parse_args()
     
@@ -1184,7 +1187,7 @@ def main():
         init_values_pool = np.load(args.init_values_pool)
     else:
         assert args.init_values != ''
-        init_values_pool = np.array([float(val) for val in args.init_values.split(',')])
+        init_values_pool = np.expand_dims(np.array([float(val) for val in args.init_values.split(',')]), 0)
     
     if args.target_par_file != '':
         target_par = np.load(args.target_par_file)[0]
