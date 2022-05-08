@@ -123,10 +123,10 @@ def test_finite_diff_raymarching_box(u, v, X, scalar_loss=None):
     amb = np.array([0.2, 0.1, 0.1])
     kd = np.array([0.8, 0.3, 0.3])
     
-    #col = select(cond_converge, amb + dif * kd, 1.)
-    col = select(cond_converge, 0., 1.)
+    col = select(cond_converge, amb + dif * kd, np.ones(3))
+    #col = select(cond_converge, 0., 1.)
 
-    return output_color([col, col, col])
+    return col
         
 shaders = [test_finite_diff_raymarching_box]
 is_color = True

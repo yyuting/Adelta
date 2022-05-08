@@ -1,17 +1,17 @@
 """
-python approx_gradient.py --dir /n/fs/scratch/yutingy/test_finite_diff_raymarching_sphere --shader test_finite_diff_raymarching_sphere --init_values_pool apps/example_init_values/test_finite_diff_raymarching_sphere_init_values_pool.npy --modes visualize_gradient --metrics naive_sum --gradient_methods_optimization ours --learning_rate 0.01 --finite_diff_h 0.01 --finite_diff_both_sides --is_col
+python approx_gradient.py --dir /n/fs/scratch/yutingy/raymarching_sphere --shader raymarching_sphere --init_values_pool apps/example_init_values/test_finite_diff_raymarching_sphere_init_values_pool.npy --modes visualize_gradient
 """
 
 from render_util import *
 from render_single import render_single
 
 def cmd_template():
-    cmd = f"""python approx_gradient.py --shader test_finite_diff_raymarching_sphere --init_values_pool apps/example_init_values/test_finite_diff_raymarching_sphere_init_values_pool.npy --metrics 5_scale_L2 --is_col"""
+    cmd = f"""python approx_gradient.py --shader raymarching_sphere --init_values_pool apps/example_init_values/test_finite_diff_raymarching_sphere_init_values_pool.npy --metrics 5_scale_L2 --is_col"""
     
     return cmd
 
-nargs = 10
-args_range = np.array([10, 10, 10, 6.28, 6.28, 6.28, 5, 5, 5, 2])
+nargs = 13
+args_range = np.array([10, 10, 10, 6.28, 6.28, 6.28, 5, 5, 5, 2, 1, 1, 1])
 
 sigmas_range = np.ones(10)
 
@@ -23,11 +23,7 @@ raymarching_loop = 32
 compiler.log_prefix_only = False
 compiler.log_intermediates_less = True
 
-def sdSphere(pos, radius):
-    dist = length(pos, 2)
-    return dist - radius
-
-def test_finite_diff_raymarching_sphere(u, v, X, scalar_loss=None):
+def raymarching_sphere(u, v, X, scalar_loss=None):
     """
     X has shape nargs + 3
     first 3 entries are u, v, time
@@ -48,13 +44,19 @@ def test_finite_diff_raymarching_sphere(u, v, X, scalar_loss=None):
     
     sphere_r = X[9]
     
-    def map_primitives(x, y, z):
+    col = np.array([X[10], X[11], X[12]])
+    
+    def sdSphere(x, y, z):
         
         pos = np.array([x, y, z])
         
         sphere_diff = pos - np.array([sphere_px, sphere_py, sphere_pz])
         
-        return sdSphere(sphere_diff, sphere_r), 1
+        dist = length(sphere_diff, 2) - sphere_r
+        
+        label = 1
+        
+        return dist, label
     
     ro = np.array([origin_x, origin_y, origin_z])
     
@@ -82,11 +84,10 @@ def test_finite_diff_raymarching_sphere(u, v, X, scalar_loss=None):
                    Var('rd1', ray_dir_p[1]),
                    Var('rd2', ray_dir_p[2])])
     
-    raymarching_ans = RaymarchingWrapper(map_primitives, ro, rd, 0, raymarching_loop, include_derivs=False)
-    cond_converge = raymarching_ans[0]
+    raymarching_ans = RaymarchingWrapper(sdSphere, ro, rd, 0, raymarching_loop, include_derivs=False)
+    cond_converge = raymarching_ans.is_converge
     
-    col = select(cond_converge, 1., 0.)
-    return output_color([col, col, col])
+    col = select(cond_converge, col, np.zeros(3))
+    return col
         
-shaders = [test_finite_diff_raymarching_sphere]
-is_color = True
+shaders = [raymarching_sphere]

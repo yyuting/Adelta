@@ -495,7 +495,6 @@ def test_finite_diff_raymarching_siggraph_cone(u, v, X, scalar_loss_scale):
     raymarching_ans = RaymarchingWrapper(raymarching_body, ro, rd, 0, raymarching_loop, include_derivs=True)
         
     t_closest = raymarching_ans[1]
-    res0 = raymarching_ans[4]
     res1 = raymarching_ans[5]
     
     deriv_sdf = [raymarching_ans[6],

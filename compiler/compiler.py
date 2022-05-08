@@ -6866,6 +6866,23 @@ class RaymarchingWrapper(Expr):
             assert self.include_derivs
             return self.derivs[index_val - 6]
         
+    @property
+    def is_converge(self):
+        return self.__getitem__(0)
+    
+    @property
+    def t(self):
+        return self.__getitem__(1)
+    
+    @property
+    def label(self):
+        return self.__getitem__(5)
+    
+    @property
+    def derivs(self):
+        return [self.__getitem__(6), self.__getitem__(7), self.__getitem__(8)]
+    
+        
 class RaymarchingLoop(Expr):
     """
     Defines a raymarching loop
