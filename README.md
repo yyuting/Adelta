@@ -10,11 +10,12 @@ The source code is developed and tested under python 3.6, Halide 10.0, TensorFlo
 
 If you are new to the concept of automatic differentation for discontinuous programs, these two Medium articles introduce the basics math and the DSL for the Adelta framework:
 
-[[Part 1](https://medium.com/@yutingyang.wh/adelta-automatic-differentiation-for-discontinuous-programs-de68b4bb8119?source=friends_link&sk=b620a5835201a1bf8d21fc2ebecc6b80)] [[Part 2](https://medium.com/@yutingyang.wh/adelta-automatic-differentiation-for-discontinuous-programs-part-2-scope-of-expressible-29f950f47a05?source=friends_link&sk=ce40aad5f5b2857cb66b568ae44a193c)]
+* [Part 1](https://medium.com/@yutingyang.wh/adelta-automatic-differentiation-for-discontinuous-programs-de68b4bb8119?source=friends_link&sk=b620a5835201a1bf8d21fc2ebecc6b80): Basic Math 
+* [Part 2](https://medium.com/@yutingyang.wh/adelta-automatic-differentiation-for-discontinuous-programs-part-2-scope-of-expressible-29f950f47a05?source=friends_link&sk=ce40aad5f5b2857cb66b568ae44a193c): Introduction to the DSL
 
 The tutorial below introduces how to author shaders programs and differentiate/optimize them under the Adelta framework:
 
-[[Part 1](https://medium.com/@yutingyang.wh/adelta-tutorial-part-1-differentiating-a-simple-shader-program-3168eb00c87b?source=friends_link&sk=7cf438907a72add62af0e4cca8e9bff6)]
+* [Part 1](https://medium.com/@yutingyang.wh/adelta-tutorial-part-1-differentiating-a-simple-shader-program-3168eb00c87b?source=friends_link&sk=7cf438907a72add62af0e4cca8e9bff6): Differentiating a Simple Shader Program
 
 ## Reproducing figures and tables in the paper
 
