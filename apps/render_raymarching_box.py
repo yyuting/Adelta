@@ -1,6 +1,6 @@
 """
 # command for visualization
-python approx_gradient.py --dir /n/fs/scratch/yutingy/test_finite_diff_raymarching_box --shader test_finite_diff_raymarching_box --init_values_pool apps/example_init_values/test_finite_diff_raymarching_half_cube_init_values_pool.npy --modes visualize_gradient --metrics naive_sum --gradient_methods_optimization ours --learning_rate 0.01 --finite_diff_h 0.01 --finite_diff_both_sides --is_col
+python approx_gradient.py --dir /n/fs/scratch/yutingy/raymarching_box --shader raymarching_box --init_values_pool apps/example_init_values/test_finite_diff_raymarching_half_cube_init_values_pool.npy --modes visualize_gradient
 """
 
 from render_util import *
@@ -8,7 +8,7 @@ from render_single import render_single
 
 def cmd_template():
     
-    cmd = f"""python approx_gradient.py --shader test_finite_diff_raymarching_box --init_values_pool apps/example_init_values/test_finite_diff_raymarching_half_cube_init_values_pool.npy --metrics 5_scale_L2 --is_col"""
+    cmd = f"""python approx_gradient.py --shader raymarching_box --init_values_pool apps/example_init_values/test_finite_diff_raymarching_half_cube_init_values_pool.npy --metrics 5_scale_L2"""
     
     return cmd
 
@@ -16,8 +16,8 @@ nargs = 9
 args_range = np.array([10, 10, 10, 6.28, 6.28, 6.28, 1, 1, 1])
 
 
-width=960
-height=640
+width = ArgumentScalar('width')
+height = ArgumentScalar('height')
 
 raymarching_loop = 32
 
@@ -29,29 +29,7 @@ check_intersect_thre = 0.01
 
 use_select_rule = 1
 
-def sdBox_deriv(pos, cube_dims, tag=None):
-    f0 = abs(pos[0]) - cube_dims[0]
-    f1 = abs(pos[1]) - cube_dims[1]
-    f2 = abs(pos[2]) - cube_dims[2]
-    
-    q0 = maximum(f0, 0)
-    q1 = maximum(f1, 0)
-    q2 = maximum(f2, 0)
-    
-    max_f1f2 = maximum(f1, f2)
-    
-    dist = (q0 ** 2 + q1 ** 2 + q2 ** 2) ** 0.5 + minimum(maximum(f0, max_f1f2), 0)
-    
-    choose_f0 = f0 > max_f1f2
-    choose_f1 = f1 > f2
-    
-    deriv = [select(choose_f0, sign(pos[0]), 0.),
-             select(choose_f0, 0., select(choose_f1, sign(pos[1]), 0.)),
-             select(choose_f0, 0., select(choose_f1, 0., sign(pos[2])))]
-    
-    return dist, deriv
-
-def test_finite_diff_raymarching_box(u, v, X, scalar_loss=None):
+def raymarching_box(u, v, X, scalar_loss=None):
     """
     X has shape nargs + 3
     first 3 entries are u, v, time
@@ -70,13 +48,7 @@ def test_finite_diff_raymarching_box(u, v, X, scalar_loss=None):
     dimy = X[7]
     dimz = X[8]
     
-    def deriv_map_obj(pos):
-
-        cube_diff = pos
-        
-        res, deriv = sdBox_deriv(cube_diff, [dimx, dimy, dimz])
-        
-        return res, 1, deriv[0], deriv[1], deriv[2]
+    
     
     ro = np.array([origin_x, origin_y, origin_z])
     
@@ -104,17 +76,36 @@ def test_finite_diff_raymarching_box(u, v, X, scalar_loss=None):
                    Var('rd1', ray_dir_p[1]),
                    Var('rd2', ray_dir_p[2])])
     
-    def raymarching_body(x, y, z):
-        return deriv_map_obj([x, y, z])
+    def sdBox(x, y, z):
+        f0 = abs(x) - dimx
+        f1 = abs(y) - dimy
+        f2 = abs(z) - dimz
+
+        q0 = maximum(f0, 0)
+        q1 = maximum(f1, 0)
+        q2 = maximum(f2, 0)
+
+        max_f1f2 = maximum(f1, f2)
+
+        dist = (q0 ** 2 + q1 ** 2 + q2 ** 2) ** 0.5 + minimum(maximum(f0, max_f1f2), 0)
+
+        choose_f0 = f0 > max_f1f2
+        choose_f1 = f1 > f2
+
+        deriv = [select(choose_f0, sign(x), 0.),
+                 select(choose_f0, 0., select(choose_f1, sign(y), 0.)),
+                 select(choose_f0, 0., select(choose_f1, 0., sign(z)))]
+        
+        label = 1
+
+        return dist, 1, deriv[0], deriv[1], deriv[2]
     
-    raymarching_ans = RaymarchingWrapper(raymarching_body, ro, rd, 0, raymarching_loop, include_derivs=True)
+    raymarching_ans = RaymarchingWrapper(sdBox, ro, rd, 0, raymarching_loop, include_derivs=True)
     
-    cond_converge = raymarching_ans[0]
-    t_closest = raymarching_ans[1]
+    cond_converge = raymarching_ans.is_converge
+    t_closest = raymarching_ans.t
     
-    deriv_sdf = [raymarching_ans[6],
-                 raymarching_ans[7],
-                 raymarching_ans[8]]
+    deriv_sdf = raymarching_ans.derivs
     
     lig = np.array([1., 2., 3.])
     lig /= np.linalg.norm(lig)
@@ -124,9 +115,8 @@ def test_finite_diff_raymarching_box(u, v, X, scalar_loss=None):
     kd = np.array([0.8, 0.3, 0.3])
     
     col = select(cond_converge, amb + dif * kd, np.ones(3))
-    #col = select(cond_converge, 0., 1.)
 
     return col
         
-shaders = [test_finite_diff_raymarching_box]
+shaders = [raymarching_box]
 is_color = True

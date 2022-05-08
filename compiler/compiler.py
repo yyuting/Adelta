@@ -6878,10 +6878,6 @@ class RaymarchingWrapper(Expr):
     def label(self):
         return self.__getitem__(5)
     
-    @property
-    def derivs(self):
-        return [self.__getitem__(6), self.__getitem__(7), self.__getitem__(8)]
-    
         
 class RaymarchingLoop(Expr):
     """

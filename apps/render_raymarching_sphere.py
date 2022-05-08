@@ -1,12 +1,12 @@
 """
-python approx_gradient.py --dir /n/fs/scratch/yutingy/raymarching_sphere --shader raymarching_sphere --init_values_pool apps/example_init_values/test_finite_diff_raymarching_sphere_init_values_pool.npy --modes visualize_gradient
+python approx_gradient.py --dir /n/fs/scratch/yutingy/raymarching_sphere --shader raymarching_sphere --init_values_pool apps/example_init_values/test_finite_diff_raymarching_sphere_init_values_pool.npy --modes visualize_gradient --render_size 640,640
 """
 
 from render_util import *
 from render_single import render_single
 
 def cmd_template():
-    cmd = f"""python approx_gradient.py --shader raymarching_sphere --init_values_pool apps/example_init_values/test_finite_diff_raymarching_sphere_init_values_pool.npy --metrics 5_scale_L2 --is_col"""
+    cmd = f"""python approx_gradient.py --shader raymarching_sphere --init_values_pool apps/example_init_values/test_finite_diff_raymarching_sphere_init_values_pool.npy --metrics 5_scale_L2 --is_col --render_size 640,640"""
     
     return cmd
 
@@ -15,8 +15,8 @@ args_range = np.array([10, 10, 10, 6.28, 6.28, 6.28, 5, 5, 5, 2, 1, 1, 1])
 
 sigmas_range = np.ones(10)
 
-width=960
-height=640
+width = ArgumentScalar('width')
+height = ArgumentScalar('height')
 
 raymarching_loop = 32
 
