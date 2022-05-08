@@ -1,6 +1,6 @@
 """
 # command for visualization
-python approx_gradient.py --dir /n/fs/scratch/yutingy/raymarching_box --shader raymarching_box --init_values_pool apps/example_init_values/test_finite_diff_raymarching_half_cube_init_values_pool.npy --modes visualize_gradient
+python approx_gradient.py --dir /n/fs/scratch/yutingy/raymarching_box --shader raymarching_box --init_values_pool apps/example_init_values/test_finite_diff_raymarching_half_cube_init_values_pool.npy --modes visualize_gradient --camera_size 640,640 --render_size 240,240 --tile_offset 150,290
 """
 
 from render_util import *

@@ -1,5 +1,5 @@
 """
-python approx_gradient.py --dir /n/fs/scratch/yutingy/raymarching_sphere --shader raymarching_sphere --init_values_pool apps/example_init_values/test_finite_diff_raymarching_sphere_init_values_pool.npy --modes visualize_gradient --render_size 640,640
+python approx_gradient.py --dir /n/fs/scratch/yutingy/raymarching_sphere --shader raymarching_sphere --init_values_pool apps/example_init_values/test_finite_diff_raymarching_sphere_init_values_pool.npy --modes visualize_gradient --camera_size 640,640 --render_size 400,400 --tile_offset 0,150
 """
 
 from render_util import *
