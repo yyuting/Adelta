@@ -16,6 +16,7 @@ If you are new to the concept of automatic differentation for discontinuous prog
 The tutorial below introduces how to author shaders programs and differentiate/optimize them under the Adelta framework:
 
 * [Part 1](https://medium.com/@yutingyang.wh/adelta-tutorial-part-1-differentiating-a-simple-shader-program-3168eb00c87b?source=friends_link&sk=7cf438907a72add62af0e4cca8e9bff6): Differentiating a Simple Shader Program
+* [Part 2](https://medium.com/@yutingyang.wh/adelta-tutorial-part-2-raymarching-primitive-42e28815ff45?source=friends_link&sk=81e78eecb102a9cb76b88458533ebd79): Raymarching Primitive
 
 ## Reproducing figures and tables in the paper
 
