@@ -71,7 +71,7 @@ def main():
     cmd += 'export HALIDE_LIB_PATH="%s/lib";\n' % hl_path
     
     for file in aot_files:
-        cmd += 'g++ /n/fs/shaderml/global_opt/proj/apps/%s.cpp $HALIDE_TOOL_PATH/GenGen.cpp -g -std=c++11 -fno-rtti -I $HALIDE_INCLUDE_PATH -L $HALIDE_LIB_PATH -lHalide -lpthread -ldl -Wl,-rpath,${HALIDE_LIB_PATH} -o %s; \n' % (file, file)
+        cmd += 'g++ %s/%s.cpp $HALIDE_TOOL_PATH/GenGen.cpp -g -std=c++11 -fno-rtti -I $HALIDE_INCLUDE_PATH -L $HALIDE_LIB_PATH -lHalide -lpthread -ldl -Wl,-rpath,${HALIDE_LIB_PATH} -o %s; \n' % (cwd, file, file)
         
     for val in compile_cmds:
         cmd += '%s;\n' % val
