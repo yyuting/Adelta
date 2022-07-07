@@ -111,7 +111,7 @@ class AdamOptim():
         return val
     
 def get_do_prune(metric, compiler_module, render_kw, min_loss_par):
-    
+        
     # prune optional updates
     if 'sigmas' in render_kw.keys():
         del render_kw['sigmas']
@@ -820,10 +820,7 @@ def estimate_std(sess, loss, set_random_var_opt, nparams, thre=0.01, feed_dict={
                 
     return current_params
 
-def main():
-    
-    global finite_diff_h
-    
+def get_args(str_args=None):
     parser = argparse_util.ArgumentParser(description='approx gradient')
     parser.add_argument('--dir', dest='dir', default='', help='directory for task')
     parser.add_argument('--shader', dest='shader', default='', help='name of shader')
@@ -950,7 +947,15 @@ def main():
     
     parser.set_defaults(is_color=True)
     
-    args = parser.parse_args()
+    args = parser.parse_args(str_args)
+    
+    return args
+
+def main(args):
+    
+    global finite_diff_h
+    
+    
     
     global tf, torch
     
@@ -3446,11 +3451,17 @@ def main():
                             else:
                                 if opt is not None:
                                     opt.reset() 
-
+                        
                         if args.backend == 'hl':
                             if ns_wide == 0:
                                 init_img = halide_fw(init_values)
                                 imsave(os.path.join(args.dir, 'init%d.png' % i), np.clip(init_img, 0, 1), True, ndims=args.ndims)
+                                if compiler_module.sigmas_scale > 0:
+                                    old_sigmas_scale = compiler_module.sigmas_scale
+                                    compiler_module.sigmas_scale = 0
+                                    init_img = halide_fw(init_values)
+                                    imsave(os.path.join(args.dir, 'init_no_random%d.png' % i), np.clip(init_img, 0, 1), True, ndims=args.ndims)
+                                    compiler_module.sigmas_scale = old_sigmas_scale
                             else:
                                 last_loss_par = np.array(min_loss_par)
                                 
@@ -4079,6 +4090,7 @@ def main():
 
     
 if __name__ == '__main__':
-    main()
+    args = get_args(str_args=None)
+    main(args)
         
     

@@ -1977,7 +1977,7 @@ return {scalar_derivs.to_source(cp.as_mode(MODE_VARNAME))}[0], np.array({scalar_
             log_list = info['producer_log_node']
             
             if compiler_params.backend == 'hl':
-                schedule_key = 'inline'
+                schedule_key = 'seperate_cont'
                 
                 # use heuristic to see if checkpointing is needed
                 # only checkpoint if raymarching loop is found
@@ -8736,6 +8736,12 @@ class Object:
                 setattr(self, key, val)
                 
             self.entries[key] = getattr(self, key)
+            
+def optional_update(update_func, vals, *args):
+    """
+    same functionality as possible_update with slightly different interface
+    """
+    possible_update(vals, update_func, *args)
                 
 def possible_update(vals, update_func, *args):
     """
