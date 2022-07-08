@@ -199,20 +199,16 @@ def siggraph(u, v, X, scalar_loss_scale):
     
     # access raymarching outputs
     
-    t_closest = raymarching_ans[1]
-    res1 = raymarching_ans[5]
-    
-    deriv_sdf = [raymarching_ans[6],
-                 raymarching_ans[7],
-                 raymarching_ans[8]]
+    t_closest = raymarching_ans.t
+    res1 = raymarching_ans.label
+    deriv_sdf = raymarching_ans.derivs
+    cond_converge = raymarching_ans.is_converge
     
     # shading the geometry
     
     pos = vec('pos', ro + rd * t_closest)
     
-    obj_label = res1
-    
-    cond_converge = raymarching_ans[0]
+    obj_label = res1    
     
     is_valid = Var('is_valid', cond_converge)
     
