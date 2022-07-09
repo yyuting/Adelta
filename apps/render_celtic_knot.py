@@ -34,6 +34,7 @@ def celtic_knot(u, v, X, scalar_loss_scale):
     fill_col = Var('fill_col', Compound([1., 1., 1.]))
     edge_col = Compound([0., 0., 0.])
     
+    # Group each ring-related parameter into a seperate object
     rings = []
     for i in range(nrings):
         
@@ -44,6 +45,7 @@ def celtic_knot(u, v, X, scalar_loss_scale):
                       tilt = ring_params[3])
         rings.append(ring)
         
+    # render each ring
     def update_ring(old_vals, ring, idx):
         # Update function should be side-effect free
         
