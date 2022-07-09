@@ -50,7 +50,7 @@ def celtic_knot2(u, v, X, scalar_loss_scale):
         old_col, old_phase = old_vals[0], old_vals[1]
         
         rel_pos = vec('rel_pos_%d' % idx, np.array([u, v]) - ring.pos)
-        ring.fill_col = fill_col
+        
         
         dist2 = Var('dist2_%s' % ring.name, rel_pos[0] ** 2 + rel_pos[1] ** 2)
         dist = Var('dist_%s' % ring.name, dist2 ** 0.5)
@@ -69,6 +69,7 @@ def celtic_knot2(u, v, X, scalar_loss_scale):
         
         cond_valid = Var('cond_valid_%s' % ring.name, cond0 & cond2)
         
+        ring.fill_col = fill_col
         col_current = Var('col_current_%s' % ring.name, select(cond1, edge_col, ring.fill_col))
         
         col = Var('col_%s' % ring.name, select(cond_valid, col_current, old_col))
