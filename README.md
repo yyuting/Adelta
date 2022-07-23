@@ -1,6 +1,10 @@
 # Adelta
 
-Adelta is a domain specific language for automatically differentiate programs with discontinuities. It is a research artifact for the SIGGRAPH 2022 paper "Aδ: Autodiff for Discontinuous Programs – Applied to Shaders" ([project page](https://pixl.cs.princeton.edu/pubs/Yang_2022_AAF/)).
+Adelta is a domain specific language for automatically differentiating programs with discontinuities. It is a research artifact for the SIGGRAPH 2022 paper "Aδ: Autodiff for Discontinuous Programs – Applied to Shaders".
+
+* [Project Page](https://pixl.cs.princeton.edu/pubs/Yang_2022_AAF/)
+* [Paper](https://pixl.cs.princeton.edu/pubs/Yang_2022_AAF/yang_adelta_2022.pdf) (6MB Preprint)
+* [Video](https://vimeo.com/703521232) (Vimeo)
 
 ## Package dependencies
 
@@ -8,9 +12,9 @@ The source code is developed and tested under python 3.6, Halide 10.0, TensorFlo
 
 ## Basic Introduction and Tutorial
 
-If you are new to the concept of automatic differentation for discontinuous programs, these two Medium articles introduce the basics math and the DSL for the Adelta framework:
+If you would like a more gentle introduction to automatic differentation for discontinuous programs, these two Medium articles introduce the basics math and the DSL for the Adelta framework:
 
-* [Part 1](https://medium.com/@yutingyang.wh/adelta-automatic-differentiation-for-discontinuous-programs-de68b4bb8119?source=friends_link&sk=b620a5835201a1bf8d21fc2ebecc6b80): Basic Math 
+* [Part 1](https://medium.com/@yutingyang.wh/adelta-automatic-differentiation-for-discontinuous-programs-de68b4bb8119?source=friends_link&sk=b620a5835201a1bf8d21fc2ebecc6b80): Math Basics
 * [Part 2](https://medium.com/@yutingyang.wh/adelta-automatic-differentiation-for-discontinuous-programs-part-2-scope-of-expressible-29f950f47a05?source=friends_link&sk=ce40aad5f5b2857cb66b568ae44a193c): Introduction to the DSL
 
 The tutorial below introduces how to author shaders programs and differentiate/optimize them under the Adelta framework:
