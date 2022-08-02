@@ -34,6 +34,7 @@ def parse():
     parser.add_argument('--deriv_metric_suffix', dest='deriv_metric_suffix', default='', help='specifies the suffix appending after the original error data')
     parser.add_argument('--visualize_img_name', dest='visualize_img_name', default='', help='if specified, use the file to visualize fw rendering')
     parser.add_argument('--ncols', dest='ncols', type=int, default=5, help='specifies the number of columns per row')
+    parser.add_argument('--crop_ratio', dest='crop_ratio', type=float, default=0, help='specifies the ratio to crop edge')
                         
     
     args = parser.parse_args()
@@ -51,7 +52,8 @@ def collect_data(args):
     
     assert args.rhs_file != ''
     derivs_rhs = np.load(args.rhs_file)
-
+    
+    
     
     err_datas = []
     
@@ -86,6 +88,13 @@ def visualize_mixed(args, err_datas):
     
     assert args.rhs_file != ''
     derivs_rhs = np.load(args.rhs_file)
+    
+    if args.crop_ratio > 0:
+        crops = [int(derivs_rhs.shape[0] * args.crop_ratio),
+                 int(derivs_rhs.shape[1] * args.crop_ratio)]
+        derivs_rhs = derivs_rhs[crops[0]:-crops[0], crops[1]:-crops[1]]
+    else:
+        crops = None
     
     visualize_img_name = args.visualize_img_name
     
@@ -158,6 +167,9 @@ def visualize_mixed(args, err_datas):
     for idx in range(len(err_datas)):
         
         current_err = err_datas[idx]
+        
+        if crops is not None:
+            current_err = current_err[crops[0]:-crops[0], crops[1]:-crops[1]]
         
         title = eval_labels[idx]
 
