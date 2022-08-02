@@ -857,6 +857,7 @@ def get_args(str_args=None):
     parser.add_argument('--save_all_par', dest='save_all_par', action='store_true', help='if specified, save tunable parameter for each iteration')
     parser.add_argument('--save_all_deriv', dest='save_all_deriv', action='store_true', help='if specified, save derivatives for every iteration')
     parser.add_argument('--verbose_save', dest='verbose_save', action='store_true', help='if specified, save every possible for each iteration')
+    parser.add_argument('--show_progress', dest='show_progress', action='store_true', help='if specified, output stars that indicate optimization progress')
     parser.add_argument('--save_best_par', dest='save_best_par', action='store_true', help='if specified, save tunable parameter for the best optimization')
     parser.add_argument('--loss_filename', dest='loss_filename', default='', help='specifies a unique filename for saved loss')
     parser.add_argument('--is_color', dest='is_color', action='store_true', help='specifies the rendering is color with 3 channel')
@@ -3405,6 +3406,9 @@ def main(args):
 
 
                         min_loss_iter = -1
+                        
+                        if args.show_progress:
+                            print('*', end='')
 
                         if args.refine_opt:
                             if ns_wide < nstages - 1:
@@ -3964,6 +3968,9 @@ def main(args):
                                 else:
                                     all_deriv = np.concatenate((all_deriv, current_deriv[:min_loss_iter+1, :]), 0)
 
+                    if args.show_progress:
+                        print()
+                    
                     if args.backend == 'hl':
                         old_sigmas_scale = compiler_module.sigmas_scale
                         compiler_module.sigmas_scale = 0

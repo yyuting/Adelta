@@ -15,6 +15,7 @@ def siggraph(u, v, X, scalar_loss_scale):
     # Access input parameters
     
     # camera position and angles
+    # vec: generate an array of variables, each with a semanticaly meaningful name
     origin_x, origin_y, origin_z = vec('origin', [X[0], X[1], X[2]])
     ang1, ang2, ang3 = vec('ang', [X[3], X[4], X[5]])
     
@@ -53,6 +54,7 @@ def siggraph(u, v, X, scalar_loss_scale):
     sin_phi = Var('sin_phi', sin(ax_phi))
     cos_phi = Var('cos_phi', cos(ax_phi))
     
+    # var: give variable a semantically meaningful name
     sin_cone_theta = Var('sin_cone_theta', sin(cone_theta))
     cos_cone_theta = Var('cos_cone_theta', cos(cone_theta))
     sin_cone_phi = Var('sin_cone_phi', sin(cone_phi))
@@ -153,6 +155,7 @@ def siggraph(u, v, X, scalar_loss_scale):
                 
         res_x = maximum(t_shell, -d3)
         
+        # select: used to represent if/else branches
         deriv_t_shell_pos0 = select(cond0, deriv_d1_pos[0], deriv_d2_pos[0])
         deriv_t_shell_pos1 = select(cond0, deriv_d1_pos[1], deriv_d2_pos[1])
         deriv_t_shell_pos2 = select(cond0, deriv_d1_pos[2], deriv_d2_pos[2])

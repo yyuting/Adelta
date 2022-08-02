@@ -18,6 +18,7 @@ args_range[2+3*nrings:2+4*nrings] = 10
 
 sigmas_range = args_range
 
+# placeholder for render size
 width = ArgumentScalar('width')
 height = ArgumentScalar('height')
 
@@ -31,6 +32,8 @@ def celtic_knot(u, v, X, scalar_loss_scale):
     curve_width = X[0] ** 2
     curve_edge = X[1] ** 2
     
+    # Var: give variables a semantically meaningful name
+    # Compound: a primitive that works similar to array
     fill_col = Var('fill_col', Compound([1., 1., 1.]))
     edge_col = Compound([0., 0., 0.])
     
@@ -71,6 +74,8 @@ def celtic_knot(u, v, X, scalar_loss_scale):
         cond_valid = Var('cond_valid_%s' % ring.name, cond0 & cond2)
         
         ring.fill_col = fill_col
+        
+        # select: used to represent if/else branches
         col_current = Var('col_current_%s' % ring.name, select(cond1, edge_col, ring.fill_col))
         
         col = Var('col_%s' % ring.name, select(cond_valid, col_current, old_col))
@@ -86,7 +91,7 @@ def celtic_knot(u, v, X, scalar_loss_scale):
     vals = [col, default_phase]
     
     for i in range(nrings):
-        vals = update_ring(vals, rings[i], i)
+        optional_update(update_ring, vals, rings[i], i)
         
     return vals[0]
 
