@@ -18,6 +18,7 @@ args_range[2+3*nrings:2+4*nrings] = 10
 
 sigmas_range = args_range
 
+# placeholder for render size
 width = ArgumentScalar('width')
 height = ArgumentScalar('height')
 
@@ -25,15 +26,21 @@ max_iter = nrings - 1
 
 default_phase = -1e4
 
-def celtic_knot2(u, v, X, scalar_loss_scale):
+def celtic_knot(u, v, X, scalar_loss_scale):
+    
+    # inout_ls: correspond to GLSL keywork inout, variables can be modified
+    u,v = Animate("animate_uv", inout_ls=[Var("u", u), Var("v", v)]).update()
     
     # make sure it's non-negative
     curve_width = X[0] ** 2
     curve_edge = X[1] ** 2
     
+    # Var: give variables a semantically meaningful name
+    # Compound: a primitive that works similar to array
     fill_col = Var('fill_col', Compound([1., 1., 1.]))
     edge_col = Compound([0., 0., 0.])
     
+    # Group each ring-related parameter into a seperate object
     rings = []
     for i in range(nrings):
         
@@ -44,13 +51,13 @@ def celtic_knot2(u, v, X, scalar_loss_scale):
                       tilt = ring_params[3])
         rings.append(ring)
         
+    # render each ring
     def update_ring(old_vals, ring, idx):
         # Update function should be side-effect free
         
         old_col, old_phase = old_vals[0], old_vals[1]
         
         rel_pos = vec('rel_pos_%d' % idx, np.array([u, v]) - ring.pos)
-        
         
         dist2 = Var('dist2_%s' % ring.name, rel_pos[0] ** 2 + rel_pos[1] ** 2)
         dist = Var('dist_%s' % ring.name, dist2 ** 0.5)
@@ -69,7 +76,10 @@ def celtic_knot2(u, v, X, scalar_loss_scale):
         
         cond_valid = Var('cond_valid_%s' % ring.name, cond0 & cond2)
         
-        ring.fill_col = fill_col
+        # in_ls: corresponds to GLSL keyword in, variables are read only
+        ring.fill_col, = Animate("ring_col%s"%idx, inout_ls=[fill_col], in_ls=[rel_pos]).update()
+        
+        # select: used to represent if/else branches
         col_current = Var('col_current_%s' % ring.name, select(cond1, edge_col, ring.fill_col))
         
         col = Var('col_%s' % ring.name, select(cond_valid, col_current, old_col))
@@ -89,5 +99,5 @@ def celtic_knot2(u, v, X, scalar_loss_scale):
         
     return vals[0]
 
-shaders = [celtic_knot2]
+shaders = [celtic_knot]
 is_color = True
