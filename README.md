@@ -45,7 +45,7 @@ Our default and most efficient backend is Halide. It also supports comparison wi
     mkdir hl_tmp
     python script_compile_halide.py <halide_install_path> hl_tmp
 
-Both TensorFlow and Pytorch backends are used for our gradient only. We additionally include the 1D and 3D examples for these two backends. Note the TensorFlow backend allows eager execution under "visualize_gradient" mode, but resorts to the legacy 1.x style compute graph implementation under "optimization" mode.
+Both TensorFlow and Pytorch backends are used for our gradient only (not for FD and SPSA). We additionally include the 1D and 3D examples for these two backends. Note the TensorFlow backend allows eager execution under "visualize_gradient" mode, but resorts to the legacy 1.x style compute graph implementation under "optimization" mode.
 
 ### Reproducing experiments in the paper
 
