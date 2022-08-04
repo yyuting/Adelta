@@ -105,7 +105,7 @@ def set_buffer(render_kw, info_kw):
     
 class nscale_L2():
     
-    def __init__(self, y=None, nscale=0, smoothing_sigmas=[], multiple_obj=True, scipy_mode=False, ignore_last_n_scale=0, opt_subset_idx=None, match_target=None):
+    def __init__(self, y=None, nscale=0, smoothing_sigmas=[], multiple_obj=True, scipy_mode=False, ignore_last_n_scale=0, opt_subset_idx=None, match_target=None, verbose=True):
         
         self.nscale = nscale
         self.smoothing_sigmas = smoothing_sigmas
@@ -132,6 +132,8 @@ class nscale_L2():
         self.is_FD = False
         self.is_SPSA = False
         self.finite_diff_h = 0
+        
+        self.verbose = verbose
         
         self.opt_subset_idx = opt_subset_idx
         
@@ -610,7 +612,8 @@ class nscale_L2():
                 
                 so_lib.gaussian_conv(self.smoothing_sigmas[idx], bufs[self.nscale], bufs[self.nscale+1+idx])
                 
-                print('initialize y pyramic, conv with sigma ', self.smoothing_sigmas[idx])
+                if self.verbose:
+                    print('initialize y pyramic, conv with sigma ', self.smoothing_sigmas[idx])
                 
         if generate_buf:
             assert len(bufs) <= ninputs
@@ -1261,7 +1264,8 @@ class GenericShader():
             denum_only=False,
             finite_diff_h=0.01, 
             SPSA_samples=-1,
-            weight_map=None):
+            weight_map=None,
+            verbose=True):
         
         assert so_loaded, 'Error! so file not loaded! Please call load_so(path) where path is the directory storing the so file!'
         
@@ -1297,8 +1301,8 @@ class GenericShader():
                         'Error! buffer [%d] has incorrect number of colors!' % i
                     
         else:
-            
-            print("reset_min set to True for newly created buffers")
+            if verbose:
+                print("reset_min set to True for newly created buffers")
             
             reset_min = True
             
@@ -1352,7 +1356,8 @@ class GenericShader():
                     arr[:] = buffer_info[i]['default_val']
                     buf.set_host_dirty()
                 
-                print("Instantiated buffer %d with shape " % i, buf_dim)
+                if verbose:
+                    print("Instantiated buffer %d with shape " % i, buf_dim)
                 
                 buffer.append(buf)
             

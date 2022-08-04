@@ -158,7 +158,10 @@ def generate_interactive_frag(args, params, do_prune):
     if do_prune is not None:
         cmd += ' --do_prune %s' % ','.join(['%d' % val for val in do_prune])
         
-    print(cmd)
+    if args.show_progress:
+        print('Generating GLSL code...')
+    else:
+        print(cmd)
     
     os.system(cmd)
     
@@ -172,6 +175,8 @@ def generate_interactive_frag(args, params, do_prune):
     """ + frag_str
     
     open(frag_file, 'w').write(frag_str)
+    
+    print('Done')
 
 def imsave(name, img, need_transpose=False, ndims=2):
     
@@ -186,7 +191,7 @@ def imsave(name, img, need_transpose=False, ndims=2):
             else:
                 assert len(img.shape) == 3
                 img = img.transpose((1, 0, 2))
-        skimage.io.imsave(name, np.clip(img, 0, 1))
+        skimage.io.imsave(name, np.clip(img, 0, 1), check_contrast=False)
     elif ndims == 3:
         #ax = plt.figure().add_subplot(projection='3d')
         #ax.voxels(img[..., 0].astype(bool))
@@ -1117,7 +1122,8 @@ def main(args):
             
     generate_code_cmd = 'cd apps; python render_single.py %s render_%s --backend %s --compiler_modes %s --use_select_rule %d --use_multiplication_rule %d %s; cd ..' % (args.dir, args.shader, args.backend, mode_str, args.use_select_rule, args.use_multiplication_rule, extra_args)
     
-    print(generate_code_cmd)
+    if not args.show_progress:
+        print(generate_code_cmd)
     
 
     def check_modes_exist(compiler_module):
@@ -1296,7 +1302,8 @@ def main(args):
                                               multiple_obj=args.multi_scale_optimization,
                                               ignore_last_n_scale=args.ignore_last_n_scale,
                                               opt_subset_idx=opt_subset_idx,
-                                              match_target=match_target)
+                                              match_target=match_target,
+                                              verbose=not args.show_progress)
             else:
                 metric = nscale_metric_functor(nscale, base_metric, smoothing_sigmas=smoothing_sigmas, axis=axis, backend=args.backend, ndims=args.ndims, ignore_last_n_scale=args.ignore_last_n_scale)
             
@@ -1337,6 +1344,9 @@ def main(args):
             render_kw['render_size'] = [default_width, default_height]
             
             render_kw['tile_offset'] = tile_offset
+            
+            if args.show_progress:
+                render_kw['verbose'] = False
             
             if args.random_uniform_uv_offset > 0:
                 render_kw['uv_offset'] = (2 * np.random.rand(2) - 1) * args.random_uniform_uv_offset
@@ -1487,7 +1497,8 @@ def main(args):
             choose_u_ls = []
             choose_u_pl_ls = []
 
-            print('comparison using metric %s' % metric_name)
+            if not args.show_progress:
+                print('comparison using metric %s' % metric_name)
 
             halide_get_derivs = None
             
@@ -2559,8 +2570,9 @@ def main(args):
                     if args.save_npy:
                         np.save(os.path.join(args.dir, 'ours_deriv.npy'), deriv_img)
 
-            print('mean magnitude error:', np.mean(magnitude_errors))
-            print('mean normalized error:', np.mean(normalized_errors))
+            if not args.show_progress:
+                print('mean magnitude error:', np.mean(magnitude_errors))
+                print('mean normalized error:', np.mean(normalized_errors))
 
             do_prune = None
             if args.backend == 'hl' and not args.ignore_glsl:
@@ -3316,7 +3328,10 @@ def main(args):
             
             best_loss = 1e8
             best_par = None
-
+            
+            if args.show_progress:
+                print('Optimizing %d random restarts' % init_values_pool.shape[0])
+                
             for i in range(init_values_pool.shape[0]):
                 if (not gt_from_file) and i == 0:
                     # the first init value is reference pos, no need to optimize
